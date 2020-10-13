@@ -1,8 +1,6 @@
 const Builder = @import("std").build.Builder;
 
 pub fn build(b: *Builder) void {
-    const std = @import("std");
-
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -18,13 +16,8 @@ pub fn build(b: *Builder) void {
     exe.setBuildMode(mode);
     exe.linkSystemLibrary("glfw3");
 
-    const builtin = @import("builtin");
     if (exe.target.isDarwin()) {
-        std.debug.print("GOT DARWIN", .{});
-        exe.linkFramework("Foundation");
-        exe.linkFramework("Cocoa");
-        exe.linkFramework("IOKit");
-        exe.linkFramework("CoreVideo");
+        exe.addFrameworkDir("/System/Library/Frameworks");
         exe.linkFramework("OpenGL");
     }
 

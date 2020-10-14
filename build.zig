@@ -12,6 +12,7 @@ pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
 
     const exe = b.addExecutable("futureproof", "src/main.zig");
+    exe.addCSourceFile("platform/darwin.c", &[_][]const u8{ "-x", "objective-c", "-c" });
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.linkSystemLibrary("glfw3");

@@ -13,7 +13,7 @@ pub fn main() anyerror!void {
     if (window == null) {
         var err_str: [*c]u8 = null;
         const err = glfw.glfwGetError(&err_str);
-        std.debug.panic("Failed to open window: {} ({})", .{err, err_str});
+        std.debug.panic("Failed to open window: {} ({})", .{ err, err_str });
     }
 
     glfw.glfwMakeContextCurrent(window);

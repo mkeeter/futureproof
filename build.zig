@@ -12,25 +12,25 @@ pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
 
     const exe = b.addExecutable("futureproof", "src/main.zig");
-    exe.addCSourceFile("platform/darwin.c", &[_][]const u8{ "-x", "objective-c", "-c" });
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.linkSystemLibrary("glfw3");
     exe.linkSystemLibrary("wgpu_native");
+    exe.addIncludeDir("vendor");
 
     // This must come before the install_name_tool call below
     exe.install();
 
     if (exe.target.isDarwin()) {
         exe.addFrameworkDir("/System/Library/Frameworks");
-        exe.linkFramework("OpenGL");
+        exe.linkFramework("Foundation");
         exe.addLibPath("vendor/wgpu");
 
         const cmd = [_][]const u8{
             "install_name_tool",
             "-change",
             "/Users/runner/work/wgpu-native/wgpu-native/target/release/deps/libwgpu_native.dylib",
-            "@executable_path/../../vendor/wgpu-macos-64-release/libwgpu_native.dylib",
+            "@executable_path/../../vendor/wgpu/libwgpu_native.dylib",
             "zig-cache/bin/futureproof",
         };
         const s = b.addSystemCommand(&cmd);

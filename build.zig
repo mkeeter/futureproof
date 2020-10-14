@@ -23,14 +23,15 @@ pub fn build(b: *Builder) void {
     if (exe.target.isDarwin()) {
         exe.addFrameworkDir("/System/Library/Frameworks");
         exe.linkFramework("OpenGL");
-        exe.addLibPath("vendor/wgpu-macos-64-release");
+        exe.addLibPath("vendor/wgpu");
 
         const cmd = [_][]const u8{
             "install_name_tool",
             "-change",
             "/Users/runner/work/wgpu-native/wgpu-native/target/release/deps/libwgpu_native.dylib",
             "@executable_path/../../vendor/wgpu-macos-64-release/libwgpu_native.dylib",
-            "zig-cache/bin/futureproof"};
+            "zig-cache/bin/futureproof",
+        };
         const s = b.addSystemCommand(&cmd);
         b.getInstallStep().dependOn(&s.step);
     }

@@ -10,10 +10,10 @@ const c = @cImport({
 });
 
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
-    // We import this separately because glfw3native.h defines id as void*,
-    // while objc/runtime.h defines it as a struct*, so we have to cast
     const platform = std.Target.current.os.tag;
     if (platform == std.Target.Os.Tag.macos) {
+        // We import this separately because glfw3native.h defines id as void*,
+        // while objc/runtime.h defines it as a struct*, so we have to cast
         const o = @cImport({
             @cInclude("objc/runtime.h");
             @cInclude("objc/message.h");

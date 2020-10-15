@@ -1,7 +1,9 @@
 const std = @import("std");
 const c = @cImport({
     @cInclude("GLFW/glfw3.h");
-    @cDefine("GLFW_EXPOSE_NATIVE_COCOA", {});
+    if (std.Target.current.os.tag == std.Target.Os.Tag.macos) {
+        @cDefine("GLFW_EXPOSE_NATIVE_COCOA", {});
+    }
     @cInclude("GLFW/glfw3native.h");
 
     @cInclude("wgpu/wgpu.h");
@@ -10,27 +12,32 @@ const c = @cImport({
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
     // We import this separately because glfw3native.h defines id as void*,
     // while objc/runtime.h defines it as a struct*, so we have to cast
-    const objc = @cImport({
-        @cInclude("objc/runtime.h");
-        @cInclude("objc/message.h");
-    });
+    const platform = std.Target.current.os.tag;
+    if (platform == std.Target.Os.Tag.macos) {
+        const o = @cImport({
+            @cInclude("objc/runtime.h");
+            @cInclude("objc/message.h");
+        });
 
-    const cocoa_window = c.glfwGetCocoaWindow(window);
-    const ns_window = @ptrCast(objc.id, @alignCast(8, cocoa_window));
+        const cocoa_window = c.glfwGetCocoaWindow(window);
+        const ns_window = @ptrCast(o.id, @alignCast(8, cocoa_window));
 
-    // Time to do hilarious Objective-C runtime hacks, equivalent to
-    //  [ns_window.contentView setWantsLayer:YES];
-    //  id metal_layer = [CAMetalLayer layer];
-    //  [ns_window.contentView setLayer:metal_layer];
-    const cv = objc.objc_msgSend(ns_window, objc.sel_getUid("contentView"));
-    _ = objc.objc_msgSend(cv, objc.sel_getUid("setWantsLayer:"), true);
+        // Time to do hilarious Objective-C runtime hacks, equivalent to
+        //  [ns_window.contentView setWantsLayer:YES];
+        //  id metal_layer = [CAMetalLayer layer];
+        //  [ns_window.contentView setLayer:metal_layer];
+        const cv = o.objc_msgSend(ns_window, o.sel_getUid("contentView"));
+        _ = o.objc_msgSend(cv, o.sel_getUid("setWantsLayer:"), true);
 
-    const ca_metal = @ptrCast(objc.id, objc.objc_lookUpClass("CAMetalLayer"));
-    const metal_layer = objc.objc_msgSend(ca_metal, objc.sel_getUid("layer"));
+        const ca_metal = @ptrCast(o.id, o.objc_lookUpClass("CAMetalLayer"));
+        const metal_layer = o.objc_msgSend(ca_metal, o.sel_getUid("layer"));
 
-    _ = objc.objc_msgSend(cv, objc.sel_getUid("setLayer:"), metal_layer);
+        _ = o.objc_msgSend(cv, o.sel_getUid("setLayer:"), metal_layer);
 
-    return c.wgpu_create_surface_from_metal_layer(metal_layer);
+        return c.wgpu_create_surface_from_metal_layer(metal_layer);
+    } else {
+        std.debug.panic("Unimplemented on platform {}", .{platform});
+    }
 }
 
 export fn adapter_cb(received: c.WGPUAdapterId, data: ?*c_void) void {
@@ -51,14 +58,12 @@ pub fn main() anyerror!void {
     }
 
     const surface = get_surface(window);
-    std.debug.print("Got surface {}\n", .{surface});
 
     var adapter: c.WGPUAdapterId = 0;
     c.wgpu_request_adapter_async(&(c.WGPURequestAdapterOptions){
-        .power_preference = @intToEnum(c.WGPUPowerPreference, c.WGPUPowerPreference_LowPower),
+        .power_preference = @intToEnum(c.WGPUPowerPreference, c.WGPUPowerPreference_HighPerformance),
         .compatible_surface = surface,
     }, 2 | 4 | 8, false, adapter_cb, &adapter);
-    std.debug.print("called request_adapter_async", .{});
 
     const device = c.wgpu_adapter_request_device(adapter, 0, &(c.WGPUCLimits){
         .max_bind_groups = 1,

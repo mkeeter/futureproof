@@ -10,13 +10,27 @@ const c = @cImport({
     @cInclude("shaderc/shaderc.h");
 });
 
-fn build_shader() void {
+fn build_shader_from_file(comptime name: []const u8) []u32 {
+    return build_shader(name, @embedFile(name));
+}
+
+fn build_shader(name: []const u8, src: []const u8) []u32 {
     const compiler = c.shaderc_compiler_initialize();
-    const result = c.shaderc_compile_into_spv(compiler, "#version 450\nvoid main() {}", 27, @intToEnum(c.shaderc_shader_kind, c.shaderc_glsl_vertex_shader), "main.vert", "main", null);
-    std.debug.print("{}\n", .{result});
-    // Do stuff with compilation results.
-    c.shaderc_result_release(result);
-    c.shaderc_compiler_release(compiler);
+    defer c.shaderc_compiler_release(compiler);
+
+    const result = c.shaderc_compile_into_spv(compiler, src.ptr, src.len, @intToEnum(c.shaderc_shader_kind, c.shaderc_glsl_infer_from_source), name.ptr, "main", null);
+    defer c.shaderc_result_release(result);
+    if (@enumToInt(c.shaderc_result_get_compilation_status(result)) != 0) {
+        const err = c.shaderc_result_get_error_message(result);
+        std.debug.panic("Shader error in {s}", .{err});
+    }
+
+    const len = c.shaderc_result_get_length(result);
+    const out = std.heap.c_allocator.alloc(u32, (len + 3) / 4) catch unreachable;
+    const ptr = c.shaderc_result_get_bytes(result);
+    @memcpy(@ptrCast([*]u8, out.ptr), ptr, len);
+
+    return out;
 }
 
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
@@ -81,16 +95,16 @@ pub fn main() anyerror!void {
     }, true, null);
 
     // Load the shaders from compiled data
-    const vert_src = @embedFile("../data/triangle.vert.spv");
+    const vert_spv = build_shader_from_file("../data/triangle.vert");
     const vert_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
-        .bytes = @ptrCast(*const u32, @alignCast(8, vert_src)),
-        .length = vert_src.len / 4,
+        .bytes = vert_spv.ptr,
+        .length = vert_spv.len,
     });
 
-    const frag_src = @embedFile("../data/triangle.frag.spv");
+    const frag_spv = build_shader_from_file("../data/triangle.frag");
     const frag_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
-        .bytes = @ptrCast(*const u32, @alignCast(8, frag_src)),
-        .length = frag_src.len / 4,
+        .bytes = frag_spv.ptr,
+        .length = frag_spv.len,
     });
 
     const bind_group_layout = c.wgpu_device_create_bind_group_layout(device, &(c.WGPUBindGroupLayoutDescriptor){

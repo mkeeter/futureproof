@@ -14,9 +14,16 @@ pub fn build(b: *Builder) void {
     const exe = b.addExecutable("futureproof", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
-    exe.linkSystemLibrary("glfw3");
-    exe.linkSystemLibrary("wgpu_native");
     exe.addIncludeDir("vendor");
+
+    // Libraries!
+    exe.linkSystemLibrary("glfw3");
+
+    exe.addLibPath("vendor/wgpu");
+    exe.linkSystemLibrary("wgpu_native");
+
+    exe.addLibPath("vendor/shaderc/lib");
+    exe.linkSystemLibrary("shaderc_combined");
 
     // This must come before the install_name_tool call below
     exe.install();
@@ -24,7 +31,6 @@ pub fn build(b: *Builder) void {
     if (exe.target.isDarwin()) {
         exe.addFrameworkDir("/System/Library/Frameworks");
         exe.linkFramework("Foundation");
-        exe.addLibPath("vendor/wgpu");
 
         const cmd = [_][]const u8{
             "install_name_tool",

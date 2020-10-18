@@ -7,7 +7,17 @@ const c = @cImport({
     @cInclude("GLFW/glfw3native.h");
 
     @cInclude("wgpu/wgpu.h");
+    @cInclude("shaderc/shaderc.h");
 });
+
+fn build_shader() void {
+    const compiler = c.shaderc_compiler_initialize();
+    const result = c.shaderc_compile_into_spv(compiler, "#version 450\nvoid main() {}", 27, @intToEnum(c.shaderc_shader_kind, c.shaderc_glsl_vertex_shader), "main.vert", "main", null);
+    std.debug.print("{}\n", .{result});
+    // Do stuff with compilation results.
+    c.shaderc_result_release(result);
+    c.shaderc_compiler_release(compiler);
+}
 
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
     const platform = std.Target.current.os.tag;
@@ -48,6 +58,7 @@ pub fn main() anyerror!void {
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});
     }
+    build_shader();
 
     const window = c.glfwCreateWindow(640, 480, "hello", null, null);
     defer c.glfwDestroyWindow(window);

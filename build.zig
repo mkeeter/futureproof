@@ -14,16 +14,18 @@ pub fn build(b: *Builder) void {
     const exe = b.addExecutable("futureproof", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
-    exe.addIncludeDir("vendor");
 
     // Libraries!
     exe.linkSystemLibrary("glfw3");
+    exe.linkSystemLibrary("stdc++"); // needed for shaderc
 
     exe.addLibPath("vendor/wgpu");
     exe.linkSystemLibrary("wgpu_native");
+    exe.addIncludeDir("vendor"); // "wgpu/wgpu.h" is the wgpu header
 
     exe.addLibPath("vendor/shaderc/lib");
     exe.linkSystemLibrary("shaderc_combined");
+    exe.addIncludeDir("vendor/shaderc/include/");
 
     // This must come before the install_name_tool call below
     exe.install();

@@ -72,7 +72,6 @@ pub fn main() anyerror!void {
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});
     }
-    build_shader();
 
     const window = c.glfwCreateWindow(640, 480, "hello", null, null);
     defer c.glfwDestroyWindow(window);

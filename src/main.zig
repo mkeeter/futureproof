@@ -10,8 +10,13 @@ const c = @cImport({
     @cInclude("shaderc/shaderc.h");
 });
 
-fn build_shader_from_file(comptime name: []const u8) []u32 {
-    return build_shader(name, @embedFile(name));
+fn build_shader_from_file(comptime name: []const u8) ![]u32 {
+    const file = try std.fs.cwd().openFile(name, std.fs.File.OpenFlags{ .read = true });
+    const size = try file.getEndPos();
+    const buf = try std.heap.c_allocator.alloc(u8, size);
+    defer std.heap.c_allocator.free(buf);
+    _ = try file.readAll(buf);
+    return build_shader(name, buf);
 }
 
 fn build_shader(name: []const u8, src: []const u8) []u32 {
@@ -94,13 +99,17 @@ pub fn main() anyerror!void {
     }, true, null);
 
     // Load the shaders from compiled data
-    const vert_spv = build_shader_from_file("../data/triangle.vert");
+    const vert_spv = build_shader_from_file("data/triangle.vert") catch |err| {
+        std.debug.panic("Could not open file", .{});
+    };
     const vert_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
         .bytes = vert_spv.ptr,
         .length = vert_spv.len,
     });
 
-    const frag_spv = build_shader_from_file("../data/triangle.frag");
+    const frag_spv = build_shader_from_file("data/triangle.frag") catch |err| {
+        std.debug.panic("Could not open file", .{});
+    };
     const frag_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
         .bytes = frag_spv.ptr,
         .length = frag_spv.len,

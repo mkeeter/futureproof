@@ -44,6 +44,43 @@ fn build_shader(name: []const u8, src: []const u8) []u32 {
     return out;
 }
 
+fn ft_test() void {
+    var ft: c.FT_Library = null;
+    var face: c.FT_Face = null;
+
+    if (c.FT_Init_FreeType(&ft) != 0) {
+        std.debug.panic("Could not initialize FreeType", .{});
+    }
+    if (c.FT_New_Face(ft, "font/Inconsolata-Regular.ttf", 0, &face) != 0) {
+        std.debug.panic("Could not create face", .{});
+    }
+    if (c.FT_Set_Char_Size(face, 0, 24 << 6, 96, 96) != 0) {
+        std.debug.panic("Could not set char size", .{});
+    }
+
+    var i: u32 = 0;
+    while (i < 128) {
+        _ = c.FT_Load_Char(face, i, c.FT_LOAD_RENDER | c.FT_LOAD_FORCE_AUTOHINT | c.FT_LOAD_TARGET_LIGHT);
+        const bmp = &(face.*.glyph.*.bitmap);
+        var row: usize = 0;
+        const pitch: usize = @intCast(usize, bmp.*.pitch);
+        while (row < bmp.*.rows) : (row += 1) {
+            var col: usize = 0;
+            while (col < bmp.*.width) : (col += 1) {
+                const p = bmp.*.buffer[row * pitch + col];
+                if (p > 0) {
+                    std.debug.print("X", .{});
+                } else {
+                    std.debug.print(" ", .{});
+                }
+            }
+            std.debug.print("\n", .{});
+        }
+        std.debug.print("\n", .{});
+        i += 1;
+    }
+}
+
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
     const platform = builtin.os.tag;
     if (platform == builtin.Os.Tag.macos) {
@@ -80,6 +117,8 @@ export fn adapter_cb(received: c.WGPUAdapterId, data: ?*c_void) void {
 }
 
 pub fn main() anyerror!void {
+    ft_test();
+
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});
     }

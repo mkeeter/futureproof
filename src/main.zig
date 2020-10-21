@@ -1,8 +1,9 @@
+const builtin = @import("builtin");
 const std = @import("std");
 const c = @cImport({
     // GLFW
     @cInclude("GLFW/glfw3.h");
-    if (std.Target.current.os.tag == std.Target.Os.Tag.macos) {
+    if (builtin.os.tag == builtin.Os.Tag.macos) {
         @cDefine("GLFW_EXPOSE_NATIVE_COCOA", {});
     }
     @cInclude("GLFW/glfw3native.h");
@@ -44,8 +45,8 @@ fn build_shader(name: []const u8, src: []const u8) []u32 {
 }
 
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
-    const platform = std.Target.current.os.tag;
-    if (platform == std.Target.Os.Tag.macos) {
+    const platform = builtin.os.tag;
+    if (platform == builtin.Os.Tag.macos) {
         // We import this separately because glfw3native.h defines id as void*,
         // while objc/runtime.h defines it as a struct*, so we have to cast
         const o = @cImport({

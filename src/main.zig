@@ -1,85 +1,9 @@
 const builtin = @import("builtin");
 const std = @import("std");
-const c = @cImport({
-    // GLFW
-    @cInclude("GLFW/glfw3.h");
-    if (builtin.os.tag == builtin.Os.Tag.macos) {
-        @cDefine("GLFW_EXPOSE_NATIVE_COCOA", {});
-    }
-    @cInclude("GLFW/glfw3native.h");
 
-    // Freetype
-    @cInclude("ft2build.h");
-    @cInclude("freetype/freetype.h");
-
-    @cInclude("wgpu/wgpu.h");
-    @cInclude("shaderc/shaderc.h");
-});
-
-fn build_shader_from_file(comptime name: []const u8) ![]u32 {
-    const file = try std.fs.cwd().openFile(name, std.fs.File.OpenFlags{ .read = true });
-    const size = try file.getEndPos();
-    const buf = try std.heap.c_allocator.alloc(u8, size);
-    defer std.heap.c_allocator.free(buf);
-    _ = try file.readAll(buf);
-    return build_shader(name, buf);
-}
-
-fn build_shader(name: []const u8, src: []const u8) []u32 {
-    const compiler = c.shaderc_compiler_initialize();
-    defer c.shaderc_compiler_release(compiler);
-
-    const result = c.shaderc_compile_into_spv(compiler, src.ptr, src.len, @intToEnum(c.shaderc_shader_kind, c.shaderc_glsl_infer_from_source), name.ptr, "main", null);
-    defer c.shaderc_result_release(result);
-    if (@enumToInt(c.shaderc_result_get_compilation_status(result)) != 0) {
-        const err = c.shaderc_result_get_error_message(result);
-        std.debug.panic("Shader error in {s}", .{err});
-    }
-
-    const len = c.shaderc_result_get_length(result);
-    const out = std.heap.c_allocator.alloc(u32, (len + 3) / 4) catch unreachable;
-    const ptr = c.shaderc_result_get_bytes(result);
-    @memcpy(@ptrCast([*]u8, out.ptr), ptr, len);
-
-    return out;
-}
-
-fn ft_test() void {
-    var ft: c.FT_Library = null;
-    var face: c.FT_Face = null;
-
-    if (c.FT_Init_FreeType(&ft) != 0) {
-        std.debug.panic("Could not initialize FreeType", .{});
-    }
-    if (c.FT_New_Face(ft, "font/Inconsolata-Regular.ttf", 0, &face) != 0) {
-        std.debug.panic("Could not create face", .{});
-    }
-    if (c.FT_Set_Char_Size(face, 0, 24 << 6, 96, 96) != 0) {
-        std.debug.panic("Could not set char size", .{});
-    }
-
-    var i: u32 = 0;
-    while (i < 128) {
-        _ = c.FT_Load_Char(face, i, c.FT_LOAD_RENDER | c.FT_LOAD_FORCE_AUTOHINT | c.FT_LOAD_TARGET_LIGHT);
-        const bmp = &(face.*.glyph.*.bitmap);
-        var row: usize = 0;
-        const pitch: usize = @intCast(usize, bmp.*.pitch);
-        while (row < bmp.*.rows) : (row += 1) {
-            var col: usize = 0;
-            while (col < bmp.*.width) : (col += 1) {
-                const p = bmp.*.buffer[row * pitch + col];
-                if (p > 0) {
-                    std.debug.print("X", .{});
-                } else {
-                    std.debug.print(" ", .{});
-                }
-            }
-            std.debug.print("\n", .{});
-        }
-        std.debug.print("\n", .{});
-        i += 1;
-    }
-}
+const c = @import("c.zig");
+const shaderc = @import("shaderc.zig");
+const ft = @import("ft.zig");
 
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
     const platform = builtin.os.tag;
@@ -117,7 +41,7 @@ export fn adapter_cb(received: c.WGPUAdapterId, data: ?*c_void) void {
 }
 
 pub fn main() anyerror!void {
-    ft_test();
+    ft.ft_test();
 
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});
@@ -144,7 +68,7 @@ pub fn main() anyerror!void {
     }, true, null);
 
     // Load the shaders from compiled data
-    const vert_spv = build_shader_from_file("data/triangle.vert") catch |err| {
+    const vert_spv = shaderc.build_shader_from_file(std.heap.c_allocator, "data/triangle.vert") catch |err| {
         std.debug.panic("Could not open file", .{});
     };
     const vert_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
@@ -152,7 +76,7 @@ pub fn main() anyerror!void {
         .length = vert_spv.len,
     });
 
-    const frag_spv = build_shader_from_file("data/triangle.frag") catch |err| {
+    const frag_spv = shaderc.build_shader_from_file(std.heap.c_allocator, "data/triangle.frag") catch |err| {
         std.debug.panic("Could not open file", .{});
     };
     const frag_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){

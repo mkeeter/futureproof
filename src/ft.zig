@@ -126,10 +126,13 @@ const Error = error{
     BbxTooBig,
     CorruptedFontHeader,
     CorruptedFontGlyphs,
+
+    // This is an extra error (not from FreeType), if the int isn't known
+    UnknownError,
 };
-fn status_to_err(i: c_int) Error {
+fn status_to_err(i: c_int) Error!void {
     switch (i) {
-        c.FT_Err_Ok => return error.Ok,
+        c.FT_Err_Ok => return,
 
         c.FT_Err_Cannot_Open_Resource => return error.CannotOpenResource,
         c.FT_Err_Unknown_File_Format => return error.UnknownFileFormat,
@@ -258,25 +261,23 @@ fn status_to_err(i: c_int) Error {
     }
 }
 
-pub fn ft_test() void {
+pub fn ft_test() !void {
     var ft: c.FT_Library = null;
     var face: c.FT_Face = null;
 
-    if (c.FT_Init_FreeType(&ft) != 0) {
-        std.debug.panic("Could not initialize FreeType", .{});
-    }
-    if (c.FT_New_Face(ft, "font/Inconsolata-Regular.ttf", 0, &face) != 0) {
-        std.debug.panic("Could not create face", .{});
-    }
-    if (c.FT_Set_Pixel_Sizes(face, 64, 64) != 0) {
-        std.debug.panic("Could not set char size", .{});
-    }
+    try status_to_err(c.FT_Init_FreeType(&ft));
+    defer status_to_err(c.FT_Done_FreeType(ft)) catch |err| {
+        std.debug.panic("Could not destroy library: {}", .{err});
+    };
+
+    try status_to_err(c.FT_New_Face(ft, "font/Inconsolata-Regular.ttf", 0, &face));
+    try status_to_err(c.FT_Set_Pixel_Sizes(face, 64, 64));
 
     var i: u8 = 0;
     const grey = " .:-=+*#%@";
     while (i < 128) {
         std.debug.print("--------------------------------------------------------------------------------\n", .{});
-        _ = c.FT_Load_Char(face, i, c.FT_LOAD_RENDER | c.FT_LOAD_TARGET_LIGHT);
+        try status_to_err(c.FT_Load_Char(face, i, c.FT_LOAD_RENDER | c.FT_LOAD_TARGET_LIGHT));
         const bmp = &(face.*.glyph.*.bitmap);
         std.debug.print("{c}: {} x {}\n", .{ i, bmp.*.width, bmp.*.rows });
 

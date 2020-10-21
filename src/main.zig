@@ -41,7 +41,7 @@ export fn adapter_cb(received: c.WGPUAdapterId, data: ?*c_void) void {
 }
 
 pub fn main() anyerror!void {
-    ft.ft_test();
+    try ft.ft_test();
 
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});

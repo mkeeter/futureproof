@@ -2,8 +2,12 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Glyph = struct {
-    x0: usize,
-    y0: usize,
+    x0: u32,
+    y0: u32,
+    width: u32,
+    height: u32,
+    x_offset: i32,
+    y_offset: i32,
 };
 
 const Atlas = struct {
@@ -25,9 +29,9 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
     try status_to_err(c.FT_Set_Pixel_Sizes(face, @intCast(c_uint, font_size), @intCast(c_uint, font_size)));
 
     // Track position within the texture atlas
-    var x: usize = 0;
-    var y: usize = 0;
-    var max_height: usize = 0;
+    var x: u32 = 0;
+    var y: u32 = 0;
+    var max_height: u32 = 0;
 
     const tex = try std.heap.c_allocator.alloc(u8, tex_size * tex_size);
     std.mem.set(u8, tex, 0);
@@ -52,8 +56,6 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
         } else if (bmp.*.rows > max_height) {
             max_height = bmp.*.rows;
         }
-        std.debug.print("{} {}\n", .{ x, y });
-
         var row: usize = 0;
         const pitch: usize = @intCast(usize, bmp.*.pitch);
         while (row < bmp.*.rows) : (row += 1) {
@@ -66,6 +68,10 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
         out.glyphs[i] = Glyph{
             .x0 = x,
             .y0 = y,
+            .width = bmp.*.width,
+            .height = bmp.*.rows,
+            .x_offset = face.*.glyph.*.bitmap_left,
+            .y_offset = face.*.glyph.*.bitmap_top,
         };
 
         x += bmp.*.width;

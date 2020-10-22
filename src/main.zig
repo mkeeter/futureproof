@@ -41,8 +41,6 @@ export fn adapter_cb(received: c.WGPUAdapterId, data: ?*c_void) void {
 }
 
 pub fn main() anyerror!void {
-    _ = try ft.build_atlas(std.heap.c_allocator, "font/Inconsolata-Regular.ttf", 64, 512);
-
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});
     }
@@ -82,6 +80,23 @@ pub fn main() anyerror!void {
     const frag_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
         .bytes = frag_spv.ptr,
         .length = frag_spv.len,
+    });
+
+    const font = try ft.build_atlas(std.heap.c_allocator, "font/Inconsolata-Regular.ttf", 64, 512);
+    const tex = c.wgpu_device_create_texture(device, &(c.WGPUTextureDescriptor){
+        .size = (c.WGPUExtent3d){
+            .width = @intCast(u32, font.tex_size),
+            .height = @intCast(u32, font.tex_size),
+            .depth = 1,
+        },
+        .mip_level_count = 1,
+        .sample_count = 1,
+        .dimension = @intToEnum(c.WGPUTextureDimension, c.WGPUTextureDimension_D2),
+        .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_R8Unorm),
+        // SAMPLED tells wgpu that we want to use this texture in shaders
+        // COPY_DST means that we want to copy data to this texture
+        .usage = c.WGPUTextureUsage_SAMPLED | c.WGPUTextureUsage_COPY_DST,
+        .label = "font_atlas",
     });
 
     const bind_group_layout = c.wgpu_device_create_bind_group_layout(device, &(c.WGPUBindGroupLayoutDescriptor){

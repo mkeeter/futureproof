@@ -53,8 +53,9 @@ pub fn main() anyerror!void {
         std.debug.panic("Failed to open window: {} ({})", .{ err, err_str });
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    // WGPU initial setup
     const surface = get_surface(window);
-
     var adapter: c.WGPUAdapterId = 0;
     c.wgpu_request_adapter_async(&(c.WGPURequestAdapterOptions){
         .power_preference = @intToEnum(c.WGPUPowerPreference, c.WGPUPowerPreference_HighPerformance),
@@ -65,7 +66,8 @@ pub fn main() anyerror!void {
         .max_bind_groups = 1,
     }, true, null);
 
-    // Load the shaders from compiled data
+    ////////////////////////////////////////////////////////////////////////////
+    // Build the shaders using shaderc
     const vert_spv = shaderc.build_shader_from_file(std.heap.c_allocator, "data/triangle.vert") catch |err| {
         std.debug.panic("Could not open file", .{});
     };
@@ -82,13 +84,17 @@ pub fn main() anyerror!void {
         .length = frag_spv.len,
     });
 
+    ////////////////////////////////////////////////////////////////////////////
+    // Create and upload the font atlas texture
     const font = try ft.build_atlas(std.heap.c_allocator, "font/Inconsolata-Regular.ttf", 64, 512);
+    const tex_size = (c.WGPUExtent3d){
+        .width = @intCast(u32, font.tex_size),
+        .height = @intCast(u32, font.tex_size),
+        .depth = 1,
+    };
+
     const tex = c.wgpu_device_create_texture(device, &(c.WGPUTextureDescriptor){
-        .size = (c.WGPUExtent3d){
-            .width = @intCast(u32, font.tex_size),
-            .height = @intCast(u32, font.tex_size),
-            .depth = 1,
-        },
+        .size = tex_size,
         .mip_level_count = 1,
         .sample_count = 1,
         .dimension = @intToEnum(c.WGPUTextureDimension, c.WGPUTextureDimension_D2),
@@ -98,7 +104,47 @@ pub fn main() anyerror!void {
         .usage = c.WGPUTextureUsage_SAMPLED | c.WGPUTextureUsage_COPY_DST,
         .label = "font_atlas",
     });
+    defer c.wgpu_texture_destroy(tex);
+    const queue = c.wgpu_device_get_default_queue(device);
+    c.wgpu_queue_write_texture(queue, &(c.WGPUTextureCopyView){
+        .texture = tex,
+        .mip_level = 0,
+        .origin = (c.WGPUOrigin3d){ .x = 0, .y = 0, .z = 0 },
+    }, font.tex.ptr, font.tex.len, &(c.WGPUTextureDataLayout){
+        .offset = 0,
+        .bytes_per_row = @intCast(u32, font.tex_size),
+        .rows_per_image = @intCast(u32, font.tex_size),
+    }, &tex_size);
 
+    const tex_view = c.wgpu_texture_create_view(tex, &(c.WGPUTextureViewDescriptor){
+        .label = "font_atlas_view",
+        .dimension = @intToEnum(c.WGPUTextureViewDimension, c.WGPUTextureViewDimension_D2),
+        .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_R8Unorm),
+        .aspect = @intToEnum(c.WGPUTextureAspect, c.WGPUTextureAspect_All),
+        .base_mip_level = 0,
+        .level_count = 1,
+        .base_array_layer = 0,
+        .array_layer_count = 1,
+    });
+    defer c.wgpu_texture_view_destroy(tex_view);
+
+    const tex_sampler = c.wgpu_device_create_sampler(device, &(c.WGPUSamplerDescriptor){
+        .next_in_chain = null,
+        .label = "font_atlas_sampler",
+        .address_mode_u = @intToEnum(c.WGPUAddressMode, c.WGPUAddressMode_ClampToEdge),
+        .address_mode_v = @intToEnum(c.WGPUAddressMode, c.WGPUAddressMode_ClampToEdge),
+        .address_mode_w = @intToEnum(c.WGPUAddressMode, c.WGPUAddressMode_ClampToEdge),
+        .mag_filter = @intToEnum(c.WGPUFilterMode, c.WGPUFilterMode_Linear),
+        .min_filter = @intToEnum(c.WGPUFilterMode, c.WGPUFilterMode_Nearest),
+        .mipmap_filter = @intToEnum(c.WGPUFilterMode, c.WGPUFilterMode_Nearest),
+        .lod_min_clamp = 0.0,
+        .lod_max_clamp = std.math.f32_max,
+        .compare = @intToEnum(c.WGPUCompareFunction, c.WGPUCompareFunction_Undefined),
+    });
+    defer c.wgpu_sampler_destroy(tex_sampler);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Bind groups (?!)
     const bind_group_layout = c.wgpu_device_create_bind_group_layout(device, &(c.WGPUBindGroupLayoutDescriptor){
         .label = "bind group layout",
         .entries = null,
@@ -113,6 +159,8 @@ pub fn main() anyerror!void {
 
     const bind_group_layouts = [_]c.WGPUBindGroupId{bind_group_layout};
 
+    ////////////////////////////////////////////////////////////////////////////
+    // Render pipelines (?!?)
     const pipeline_layout = c.wgpu_device_create_pipeline_layout(device, &(c.WGPUPipelineLayoutDescriptor){
         .bind_group_layouts = &bind_group_layouts,
         .bind_group_layouts_length = bind_group_layouts.len,
@@ -212,7 +260,6 @@ pub fn main() anyerror!void {
         c.wgpu_render_pass_set_bind_group(rpass, 0, bind_group, null, 0);
         c.wgpu_render_pass_draw(rpass, 3, 1, 0, 0);
 
-        const queue = c.wgpu_device_get_default_queue(device);
         c.wgpu_render_pass_end_pass(rpass);
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);
         c.wgpu_queue_submit(queue, &cmd_buf, 1);

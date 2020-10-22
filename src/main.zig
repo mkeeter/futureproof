@@ -41,7 +41,7 @@ export fn adapter_cb(received: c.WGPUAdapterId, data: ?*c_void) void {
 }
 
 pub fn main() anyerror!void {
-    try ft.ft_test();
+    _ = try ft.build_atlas(std.heap.c_allocator, "font/Inconsolata-Regular.ttf", 64, 512);
 
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});

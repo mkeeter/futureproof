@@ -1,6 +1,80 @@
 const std = @import("std");
 const c = @import("c.zig");
 
+const Glyph = struct {
+    x0: usize,
+    y0: usize,
+};
+
+const Atlas = struct {
+    glyphs: [128]Glyph,
+    tex: []u8,
+    tex_size: usize,
+};
+
+pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, font_size: usize, tex_size: usize) !Atlas {
+    var ft: c.FT_Library = null;
+    var face: c.FT_Face = null;
+
+    try status_to_err(c.FT_Init_FreeType(&ft));
+    defer status_to_err(c.FT_Done_FreeType(ft)) catch |err| {
+        std.debug.panic("Could not destroy library: {}", .{err});
+    };
+
+    try status_to_err(c.FT_New_Face(ft, font_name.ptr, 0, &face));
+    try status_to_err(c.FT_Set_Pixel_Sizes(face, @intCast(c_uint, font_size), @intCast(c_uint, font_size)));
+
+    // Track position within the texture atlas
+    var x: usize = 0;
+    var y: usize = 0;
+    var max_height: usize = 0;
+
+    const tex = try std.heap.c_allocator.alloc(u8, tex_size * tex_size);
+    std.mem.set(u8, tex, 0);
+    var out = Atlas{
+        .tex = tex,
+        .tex_size = tex_size,
+        .glyphs = undefined,
+    };
+
+    var i: u8 = 0;
+    while (i < 128) : (i += 1) {
+        try status_to_err(c.FT_Load_Char(face, i, c.FT_LOAD_RENDER | c.FT_LOAD_TARGET_LIGHT));
+        const bmp = &(face.*.glyph.*.bitmap);
+
+        if (x + bmp.*.width >= tex_size) {
+            y += max_height;
+            x = 0;
+            max_height = 0;
+        }
+        if (y + bmp.*.rows >= tex_size) {
+            std.debug.panic("Ran out of atlas space", .{});
+        } else if (bmp.*.rows > max_height) {
+            max_height = bmp.*.rows;
+        }
+        std.debug.print("{} {}\n", .{ x, y });
+
+        var row: usize = 0;
+        const pitch: usize = @intCast(usize, bmp.*.pitch);
+        while (row < bmp.*.rows) : (row += 1) {
+            var col: usize = 0;
+            while (col < bmp.*.width) : (col += 1) {
+                const p: u8 = bmp.*.buffer[row * pitch + col];
+                out.tex[x + col + tex_size * (row + y)] = p;
+            }
+        }
+        out.glyphs[i] = Glyph{
+            .x0 = x,
+            .y0 = y,
+        };
+
+        x += bmp.*.width;
+    }
+
+    return out;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // TODO: generate all of this at comptime
 const Error = error{
     // Ok = 0
@@ -258,43 +332,5 @@ fn status_to_err(i: c_int) Error!void {
         c.FT_Err_Corrupted_Font_Glyphs => return error.CorruptedFontGlyphs,
 
         else => return error.UnknownError,
-    }
-}
-
-pub fn ft_test() !void {
-    var ft: c.FT_Library = null;
-    var face: c.FT_Face = null;
-
-    try status_to_err(c.FT_Init_FreeType(&ft));
-    defer status_to_err(c.FT_Done_FreeType(ft)) catch |err| {
-        std.debug.panic("Could not destroy library: {}", .{err});
-    };
-
-    try status_to_err(c.FT_New_Face(ft, "font/Inconsolata-Regular.ttf", 0, &face));
-    try status_to_err(c.FT_Set_Pixel_Sizes(face, 64, 64));
-
-    var i: u8 = 0;
-    const grey = " .:-=+*#%@";
-    while (i < 128) {
-        std.debug.print("--------------------------------------------------------------------------------\n", .{});
-        try status_to_err(c.FT_Load_Char(face, i, c.FT_LOAD_RENDER | c.FT_LOAD_TARGET_LIGHT));
-        const bmp = &(face.*.glyph.*.bitmap);
-        std.debug.print("{c}: {} x {}\n", .{ i, bmp.*.width, bmp.*.rows });
-
-        var row: usize = 0;
-        const pitch: usize = @intCast(usize, bmp.*.pitch);
-        while (row < bmp.*.rows) : (row += 1) {
-            var col: usize = 0;
-            while (col < bmp.*.width) : (col += 1) {
-                const p: u8 = bmp.*.buffer[row * pitch + col];
-                const q = (@intCast(u32, p) * 10) / 256;
-                std.debug.assert(q >= 0);
-                std.debug.assert(q < 10);
-                std.debug.print("{c}", .{grey[q]});
-            }
-            std.debug.print("\n", .{});
-        }
-        std.debug.print("\n", .{});
-        i += 1;
     }
 }

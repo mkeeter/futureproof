@@ -307,7 +307,7 @@ pub fn main() anyerror!void {
 
         c.wgpu_render_pass_set_pipeline(rpass, render_pipeline);
         c.wgpu_render_pass_set_bind_group(rpass, 0, bind_group, null, 0);
-        c.wgpu_render_pass_draw(rpass, 3, 1, 0, 0);
+        c.wgpu_render_pass_draw(rpass, 6, 1, 0, 0);
 
         c.wgpu_render_pass_end_pass(rpass);
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);

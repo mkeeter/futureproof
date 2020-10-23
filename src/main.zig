@@ -145,16 +145,66 @@ pub fn main() anyerror!void {
 
     ////////////////////////////////////////////////////////////////////////////
     // Bind groups (?!)
+    const bind_group_layout_entries = [_]c.WGPUBindGroupLayoutEntry{
+        (c.WGPUBindGroupLayoutEntry){
+            .binding = 0,
+            .visibility = c.WGPUShaderStage_FRAGMENT,
+            .ty = c.WGPUBindingType_SampledTexture,
+
+            .multisampled = false,
+            .view_dimension = @intToEnum(c.WGPUTextureViewDimension, c.WGPUTextureViewDimension_D2),
+            .texture_component_type = @intToEnum(c.WGPUTextureComponentType, c.WGPUTextureComponentType_Uint),
+            .storage_texture_format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_R8Unorm),
+
+            .count = undefined,
+            .has_dynamic_offset = undefined,
+            .min_buffer_binding_size = undefined,
+        },
+        (c.WGPUBindGroupLayoutEntry){
+            .binding = 1,
+            .visibility = c.WGPUShaderStage_FRAGMENT,
+            .ty = c.WGPUBindingType_Sampler,
+
+            .multisampled = false,
+            .view_dimension = @intToEnum(c.WGPUTextureViewDimension, c.WGPUTextureViewDimension_D2),
+            .texture_component_type = @intToEnum(c.WGPUTextureComponentType, c.WGPUTextureComponentType_Uint),
+
+            .storage_texture_format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_R8Unorm),
+            .count = 0,
+            .has_dynamic_offset = undefined,
+            .min_buffer_binding_size = 0,
+        },
+    };
     const bind_group_layout = c.wgpu_device_create_bind_group_layout(device, &(c.WGPUBindGroupLayoutDescriptor){
         .label = "bind group layout",
-        .entries = null,
-        .entries_length = 0,
+        .entries = &bind_group_layout_entries,
+        .entries_length = bind_group_layout_entries.len,
     });
+    const bind_group_entries = [_]c.WGPUBindGroupEntry{
+        (c.WGPUBindGroupEntry){
+            .binding = 0,
+            .texture_view = tex_view,
+            .sampler = 0, // None
+            .buffer = 0, // None
+
+            .offset = undefined,
+            .size = undefined,
+        },
+        (c.WGPUBindGroupEntry){
+            .binding = 1,
+            .sampler = tex_sampler,
+            .texture_view = 0, // None
+            .buffer = 0, // None
+
+            .offset = undefined,
+            .size = undefined,
+        },
+    };
     const bind_group = c.wgpu_device_create_bind_group(device, &(c.WGPUBindGroupDescriptor){
         .label = "bind group",
         .layout = bind_group_layout,
-        .entries = null,
-        .entries_length = 0,
+        .entries = &bind_group_entries,
+        .entries_length = bind_group_entries.len,
     });
 
     const bind_group_layouts = [_]c.WGPUBindGroupId{bind_group_layout};

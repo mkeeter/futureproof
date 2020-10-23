@@ -265,7 +265,7 @@ pub fn main() anyerror!void {
     while (c.glfwWindowShouldClose(window) == 0) {
         var width: c_int = 0;
         var height: c_int = 0;
-        c.glfwGetWindowSize(window, &width, &height);
+        c.glfwGetFramebufferSize(window, &width, &height);
         if ((width != prev_width) or (height != prev_height)) {
             prev_width = width;
             prev_height = height;

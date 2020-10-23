@@ -206,7 +206,6 @@ pub fn main() anyerror!void {
         .entries = &bind_group_entries,
         .entries_length = bind_group_entries.len,
     });
-
     const bind_group_layouts = [_]c.WGPUBindGroupId{bind_group_layout};
 
     ////////////////////////////////////////////////////////////////////////////

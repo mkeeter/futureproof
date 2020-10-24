@@ -29,12 +29,12 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
     try status_to_err(c.FT_Set_Pixel_Sizes(face, @intCast(c_uint, font_size), @intCast(c_uint, font_size)));
 
     // Track position within the texture atlas
-    var x: u32 = 0;
-    var y: u32 = 0;
+    var x: u32 = 1;
+    var y: u32 = 1;
     var max_height: u32 = 0;
 
     const tex = try std.heap.c_allocator.alloc(u8, tex_size * tex_size);
-    std.mem.set(u8, tex, 0);
+    std.mem.set(u8, tex, 128);
     var out = Atlas{
         .tex = tex,
         .tex_size = tex_size,
@@ -48,7 +48,7 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
 
         if (x + bmp.*.width >= tex_size) {
             y += max_height;
-            x = 0;
+            x = 1;
             max_height = 0;
         }
         if (y + bmp.*.rows >= tex_size) {

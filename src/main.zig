@@ -5,6 +5,12 @@ const c = @import("c.zig");
 const shaderc = @import("shaderc.zig");
 const ft = @import("ft.zig");
 
+// TODO: put this in a header file and #include it in shaders?
+const Uniforms = extern struct {
+    width_px: u32,
+    height_px: u32,
+};
+
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
     const platform = builtin.os.tag;
     if (platform == builtin.Os.Tag.macos) {
@@ -144,6 +150,15 @@ pub fn main() anyerror!void {
     defer c.wgpu_sampler_destroy(tex_sampler);
 
     ////////////////////////////////////////////////////////////////////////////
+    // Uniform buffers
+    const uniform_buffer = c.wgpu_device_create_buffer(device, &(c.WGPUBufferDescriptor){
+        .label = "Uniforms",
+        .size = @sizeOf(Uniforms),
+        .usage = c.WGPUBufferUsage_UNIFORM | c.WGPUBufferUsage_COPY_DST,
+        .mapped_at_creation = false,
+    });
+
+    ////////////////////////////////////////////////////////////////////////////
     // Bind groups (?!)
     const bind_group_layout_entries = [_]c.WGPUBindGroupLayoutEntry{
         (c.WGPUBindGroupLayoutEntry){
@@ -168,11 +183,25 @@ pub fn main() anyerror!void {
             .multisampled = false,
             .view_dimension = @intToEnum(c.WGPUTextureViewDimension, c.WGPUTextureViewDimension_D2),
             .texture_component_type = @intToEnum(c.WGPUTextureComponentType, c.WGPUTextureComponentType_Uint),
-
             .storage_texture_format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_R8Unorm),
-            .count = 0,
+
+            .count = undefined,
             .has_dynamic_offset = undefined,
+            .min_buffer_binding_size = undefined,
+        },
+        (c.WGPUBindGroupLayoutEntry){
+            .binding = 2,
+            .visibility = c.WGPUShaderStage_FRAGMENT,
+            .ty = c.WGPUBindingType_UniformBuffer,
+
+            .has_dynamic_offset = false,
             .min_buffer_binding_size = 0,
+
+            .multisampled = undefined,
+            .view_dimension = undefined,
+            .texture_component_type = undefined,
+            .storage_texture_format = undefined,
+            .count = undefined,
         },
     };
     const bind_group_layout = c.wgpu_device_create_bind_group_layout(device, &(c.WGPUBindGroupLayoutDescriptor){
@@ -198,6 +227,15 @@ pub fn main() anyerror!void {
 
             .offset = undefined,
             .size = undefined,
+        },
+        (c.WGPUBindGroupEntry){
+            .binding = 2,
+            .buffer = uniform_buffer,
+            .offset = 0,
+            .size = @sizeOf(Uniforms),
+
+            .sampler = 0, // None
+            .texture_view = 0, // None
         },
     };
     const bind_group = c.wgpu_device_create_bind_group(device, &(c.WGPUBindGroupDescriptor){
@@ -270,13 +308,20 @@ pub fn main() anyerror!void {
             prev_width = width;
             prev_height = height;
 
+            const u = (Uniforms){
+                .width_px = @intCast(u32, width),
+                .height_px = @intCast(u32, height),
+            };
+            std.debug.print("Resized to {} {}\n", .{ width, height });
+
             swap_chain = c.wgpu_device_create_swap_chain(device, surface, &(c.WGPUSwapChainDescriptor){
                 .usage = c.WGPUTextureUsage_OUTPUT_ATTACHMENT,
                 .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_Bgra8Unorm),
-                .width = @intCast(u32, width),
-                .height = @intCast(u32, height),
+                .width = u.width_px,
+                .height = u.width_px,
                 .present_mode = @intToEnum(c.WGPUPresentMode, c.WGPUPresentMode_Fifo),
             });
+            c.wgpu_queue_write_buffer(queue, uniform_buffer, 0, @ptrCast([*c]const u8, &u), @sizeOf(Uniforms));
         }
 
         const next_texture = c.wgpu_swap_chain_get_next_texture(swap_chain);
@@ -304,6 +349,7 @@ pub fn main() anyerror!void {
             .color_attachments_length = color_attachments.len,
             .depth_stencil_attachment = null,
         });
+        //c.wgpu_render_pass_set_viewport(rpass, 0.0, 0.0, @intToFloat(f32, width), @intToFloat(f32, height), -1.0, 1.0);
 
         c.wgpu_render_pass_set_pipeline(rpass, render_pipeline);
         c.wgpu_render_pass_set_bind_group(rpass, 0, bind_group, null, 0);

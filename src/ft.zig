@@ -54,7 +54,7 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
         const bmp = &(face.*.glyph.*.bitmap);
 
         { // Store the glyph advance
-            const g = @intCast(u32, face.*.glyph.*.advance.x);
+            const g = @intCast(u32, face.*.glyph.*.advance.x >> 6);
             if (i == 0) {
                 out.u.glyph_advance = g;
             } else if (g != out.u.glyph_advance) {

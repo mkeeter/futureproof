@@ -9,6 +9,7 @@ const ft = @import("ft.zig");
 const Uniforms = extern struct {
     width_px: u32,
     height_px: u32,
+    font: ft.AtlasUniforms,
 };
 
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
@@ -311,6 +312,7 @@ pub fn main() anyerror!void {
             const u = (Uniforms){
                 .width_px = @intCast(u32, width),
                 .height_px = @intCast(u32, height),
+                .font = font.u,
             };
             std.debug.print("Resized to {} {}\n", .{ width, height });
 

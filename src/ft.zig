@@ -1,7 +1,9 @@
 const std = @import("std");
 const c = @import("c.zig");
 
-const Glyph = struct {
+// The Glyph and AtlasUniforms structs are copied directly to the GPU,
+// so they must be marked as 'extern'
+pub const Glyph = extern struct {
     x0: u32,
     y0: u32,
     width: u32,
@@ -10,13 +12,18 @@ const Glyph = struct {
     y_offset: i32,
 };
 
-const Atlas = struct {
+pub const AtlasUniforms = extern struct {
     glyphs: [128]Glyph,
-    tex: []u8,
-    tex_size: usize,
+    glyph_advance: u32, // For a fixed-width font, advance is constant
 };
 
-pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, font_size: usize, tex_size: usize) !Atlas {
+const Atlas = struct {
+    u: AtlasUniforms,
+    tex: []u8,
+    tex_size: u32,
+};
+
+pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, font_size: u32, tex_size: u32) !Atlas {
     var ft: c.FT_Library = null;
     var face: c.FT_Face = null;
 
@@ -38,7 +45,7 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
     var out = Atlas{
         .tex = tex,
         .tex_size = tex_size,
-        .glyphs = undefined,
+        .u = undefined,
     };
 
     var i: u8 = 0;
@@ -46,6 +53,16 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
         try status_to_err(c.FT_Load_Char(face, i, c.FT_LOAD_RENDER | c.FT_LOAD_TARGET_LIGHT));
         const bmp = &(face.*.glyph.*.bitmap);
 
+        { // Store the glyph advance
+            const g = @intCast(u32, face.*.glyph.*.advance.x);
+            if (i == 0) {
+                out.u.glyph_advance = g;
+            } else if (g != out.u.glyph_advance) {
+                std.debug.panic("Inconsistent glyph advance; is font not fixed-width?", .{});
+            }
+        }
+
+        // Reset to the beginning of the line
         if (x + bmp.*.width >= tex_size) {
             y += max_height;
             x = 1;
@@ -65,7 +82,7 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
                 out.tex[x + col + tex_size * (row + y)] = p;
             }
         }
-        out.glyphs[i] = Glyph{
+        out.u.glyphs[i] = Glyph{
             .x0 = x,
             .y0 = y,
             .width = bmp.*.width,

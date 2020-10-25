@@ -318,7 +318,7 @@ pub fn main() anyerror!void {
                 .usage = c.WGPUTextureUsage_OUTPUT_ATTACHMENT,
                 .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_Bgra8Unorm),
                 .width = u.width_px,
-                .height = u.width_px,
+                .height = u.height_px,
                 .present_mode = @intToEnum(c.WGPUPresentMode, c.WGPUPresentMode_Fifo),
             });
             c.wgpu_queue_write_buffer(queue, uniform_buffer, 0, @ptrCast([*c]const u8, &u), @sizeOf(Uniforms));

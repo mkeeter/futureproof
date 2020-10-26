@@ -29,6 +29,28 @@ fn status_to_err(i: c_int) CompilationError {
     }
 }
 
+export fn include_cb(user_data: ?*c_void, requested_source: [*c]const u8, include_type: c_int, requesting_source: [*c]const u8, include_depth: usize) *c.shaderc_include_result {
+    const alloc = @ptrCast(*std.mem.Allocator, @alignCast(8, user_data));
+    var out = alloc.create(c.shaderc_include_result) catch |err| {
+        std.debug.panic("Could not allocate shaderc_include_result: {}", .{err});
+    };
+    std.debug.print("Trying to include {s}\n", .{requested_source});
+
+    out.source_name = "";
+    out.source_name_length = 0;
+    out.content = "OH NO";
+    out.content_length = 6;
+    out.user_data = user_data;
+
+    return out;
+}
+
+export fn include_release_cb(user_data: ?*c_void, include_result: ?*c.shaderc_include_result) void {
+    const alloc = @ptrCast(*std.mem.Allocator, @alignCast(8, user_data));
+    alloc.destroy(@ptrCast(*c.shaderc_include_result, include_result));
+    return;
+}
+
 pub fn build_shader_from_file(alloc: *std.mem.Allocator, comptime name: []const u8) ![]u32 {
     const file = try std.fs.cwd().openFile(name, std.fs.File.OpenFlags{ .read = true });
     const size = try file.getEndPos();
@@ -42,7 +64,10 @@ pub fn build_shader(alloc: *std.mem.Allocator, name: []const u8, src: []const u8
     const compiler = c.shaderc_compiler_initialize();
     defer c.shaderc_compiler_release(compiler);
 
-    const result = c.shaderc_compile_into_spv(compiler, src.ptr, src.len, @intToEnum(c.shaderc_shader_kind, c.shaderc_glsl_infer_from_source), name.ptr, "main", null);
+    const options = c.shaderc_compile_options_initialize();
+    c.shaderc_compile_options_set_include_callbacks(options, include_cb, include_release_cb, alloc);
+
+    const result = c.shaderc_compile_into_spv(compiler, src.ptr, src.len, @intToEnum(c.shaderc_shader_kind, c.shaderc_glsl_infer_from_source), name.ptr, "main", options);
     defer c.shaderc_result_release(result);
     const r = c.shaderc_result_get_compilation_status(result);
     if (@enumToInt(r) != c.shaderc_compilation_status_success) {

@@ -34,21 +34,51 @@ export fn include_cb(user_data: ?*c_void, requested_source: [*c]const u8, includ
     var out = alloc.create(c.shaderc_include_result) catch |err| {
         std.debug.panic("Could not allocate shaderc_include_result: {}", .{err});
     };
-    std.debug.print("Trying to include {s}\n", .{requested_source});
+    out.* = (c.shaderc_include_result){
+        .user_data = user_data,
+        .source_name = "",
+        .source_name_length = 0,
+        .content = null,
+        .content_length = 0,
+    };
 
-    out.source_name = "";
-    out.source_name_length = 0;
-    out.content = "OH NO";
-    out.content_length = 6;
-    out.user_data = user_data;
+    const name = std.mem.spanZ(requested_source);
+    const file = std.fs.cwd().openFile(name, std.fs.File.OpenFlags{ .read = true }) catch |err| {
+        const msg = std.fmt.allocPrint(alloc, "{}", .{err}) catch |err2| {
+            std.debug.panic("Could not allocate error message: {}", .{err2});
+        };
+        out.content = msg.ptr;
+        out.content_length = msg.len;
 
+        return out;
+    };
+
+    const size = file.getEndPos() catch |err| {
+        std.debug.panic("Could not get end position of file: {}", .{err});
+    };
+    const buf = alloc.alloc(u8, size) catch |err| {
+        std.debug.panic("Could not allocate space for data: {}", .{err});
+    };
+    _ = file.readAll(buf) catch |err| {
+        std.debug.panic("Could not read header: {}", .{err});
+    };
+
+    out.source_name = requested_source;
+    out.source_name_length = name.len;
+    out.content = buf.ptr;
+    out.content_length = buf.len;
     return out;
 }
 
 export fn include_release_cb(user_data: ?*c_void, include_result: ?*c.shaderc_include_result) void {
-    const alloc = @ptrCast(*std.mem.Allocator, @alignCast(8, user_data));
-    alloc.destroy(@ptrCast(*c.shaderc_include_result, include_result));
-    return;
+    if (include_result != null) {
+        const alloc = @ptrCast(*std.mem.Allocator, @alignCast(8, user_data));
+        const r = @ptrCast(*c.shaderc_include_result, include_result);
+        if (r.*.content != null) {
+            alloc.destroy(r.*.content);
+        }
+        alloc.destroy(r);
+    }
 }
 
 pub fn build_shader_from_file(alloc: *std.mem.Allocator, comptime name: []const u8) ![]u32 {

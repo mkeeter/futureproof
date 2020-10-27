@@ -3,14 +3,11 @@
 #extension GL_EXT_scalar_block_layout : require
 #include "extern/futureproof.h"
 
-out gl_PerVertex {
-    vec4 gl_Position;
-};
-
-layout(location=0) out vec2 v_tex_coords;
 layout(set=0, binding=2, std430) uniform Uniforms {
     fpUniforms u;
 };
+
+layout(location=0) out vec2 v_tex_coords;
 
 // Hard-coded triangle layout
 const vec2 positions[6] = vec2[6](
@@ -32,8 +29,8 @@ void main() {
     uvec2 p = tile * uvec2(u.font.glyph_advance, u.font.glyph_height);
 
     vec2 f = (p / vec2(u.width_px, u.height_px) - 0.5) * 2;
-    const vec2 tile_size_f = vec2(u.font.glyph_advance / float(u.width_px),
-                                  u.font.glyph_height / float(u.height_px));
+    const vec2 tile_size_f = vec2(u.font.glyph_advance / float(u.width_px) * 2,
+                                  u.font.glyph_height / float(u.height_px) * 2);
 
     gl_Position = vec4(f + tile_size_f * positions[gl_VertexIndex % 6], 0.0, 1.0);
     v_tex_coords = positions[gl_VertexIndex % 6];

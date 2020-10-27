@@ -14,4 +14,6 @@ pub usingnamespace @cImport({
 
     @cInclude("wgpu/wgpu.h");
     @cInclude("shaderc/shaderc.h");
+
+    @cInclude("futureproof.h");
 });

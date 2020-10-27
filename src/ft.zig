@@ -1,24 +1,8 @@
 const std = @import("std");
 const c = @import("c.zig");
 
-// The Glyph and AtlasUniforms structs are copied directly to the GPU,
-// so they must be marked as 'extern'
-pub const Glyph = extern struct {
-    x0: u32,
-    y0: u32,
-    width: u32,
-    height: u32,
-    x_offset: i32,
-    y_offset: i32,
-};
-
-pub const AtlasUniforms = extern struct {
-    glyphs: [128]Glyph,
-    glyph_advance: u32, // For a fixed-width font, advance is constant
-};
-
 const Atlas = struct {
-    u: AtlasUniforms,
+    u: c.fpAtlasUniforms,
     tex: []u8,
     tex_size: u32,
 };
@@ -82,7 +66,7 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
                 out.tex[x + col + tex_size * (row + y)] = p;
             }
         }
-        out.u.glyphs[i] = Glyph{
+        out.u.glyphs[i] = c.fpGlyph{
             .x0 = x,
             .y0 = y,
             .width = bmp.*.width,

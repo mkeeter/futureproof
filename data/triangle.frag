@@ -4,6 +4,7 @@
 #include "extern/futureproof.h"
 
 layout(location=0) in  vec2 v_tex_coords;
+layout(location=1) in flat uint v_ascii;
 
 layout(location=0) out vec4 out_color;
 
@@ -14,7 +15,6 @@ layout(set=0, binding=2, std430) uniform Uniforms {
 };
 
 void main() {
-    const uint v_ascii = 97;
     fpGlyph glyph = u.font.glyphs[v_ascii];
 
     float t = texelFetch(sampler2D(font_tex, font_sampler),

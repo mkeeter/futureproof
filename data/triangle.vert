@@ -8,6 +8,7 @@ layout(set=0, binding=2, std430) uniform Uniforms {
 };
 
 layout(location=0) out vec2 v_tex_coords;
+layout(location=1) out flat uint v_ascii;
 
 // Hard-coded triangle layout
 const vec2 positions[6] = vec2[6](
@@ -34,4 +35,5 @@ void main() {
 
     gl_Position = vec4(f + tile_size_f * positions[gl_VertexIndex % 6], 0.0, 1.0);
     v_tex_coords = positions[gl_VertexIndex % 6];
+    v_ascii = 97; // 'a'
 }

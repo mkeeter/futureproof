@@ -15,10 +15,13 @@ struct fpGlyph {
 };
 struct fpAtlasUniforms {
     MEMBER_STRUCT fpGlyph glyphs[128];
+    uint32_t glyph_height;
     uint32_t glyph_advance;
 };
 struct fpUniforms {
     uint32_t width_px;
     uint32_t height_px;
+    uint32_t x_tiles;
+    uint32_t y_tiles;
     MEMBER_STRUCT fpAtlasUniforms font;
 };

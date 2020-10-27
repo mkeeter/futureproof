@@ -185,7 +185,7 @@ pub fn main() anyerror!void {
         },
         (c.WGPUBindGroupLayoutEntry){
             .binding = 2,
-            .visibility = c.WGPUShaderStage_FRAGMENT,
+            .visibility = c.WGPUShaderStage_VERTEX | c.WGPUShaderStage_FRAGMENT,
             .ty = c.WGPUBindingType_UniformBuffer,
 
             .has_dynamic_offset = false,
@@ -294,6 +294,7 @@ pub fn main() anyerror!void {
     var prev_width: c_int = -1;
     var prev_height: c_int = -1;
     var swap_chain: c.WGPUSwapChainId = 0;
+    var total_tiles: u32 = 0;
     while (c.glfwWindowShouldClose(window) == 0) {
         var width: c_int = 0;
         var height: c_int = 0;
@@ -302,9 +303,14 @@ pub fn main() anyerror!void {
             prev_width = width;
             prev_height = height;
 
+            const x_tiles = @intCast(u32, width) / font.u.glyph_advance;
+            const y_tiles = @intCast(u32, height) / font.u.glyph_height;
+            total_tiles = x_tiles * y_tiles;
             const u = (c.fpUniforms){
                 .width_px = @intCast(u32, width),
                 .height_px = @intCast(u32, height),
+                .x_tiles = x_tiles,
+                .y_tiles = y_tiles,
                 .font = font.u,
             };
             std.debug.print("Resized to {} {}\n", .{ width, height });
@@ -344,11 +350,10 @@ pub fn main() anyerror!void {
             .color_attachments_length = color_attachments.len,
             .depth_stencil_attachment = null,
         });
-        //c.wgpu_render_pass_set_viewport(rpass, 0.0, 0.0, @intToFloat(f32, width), @intToFloat(f32, height), -1.0, 1.0);
 
         c.wgpu_render_pass_set_pipeline(rpass, render_pipeline);
         c.wgpu_render_pass_set_bind_group(rpass, 0, bind_group, null, 0);
-        c.wgpu_render_pass_draw(rpass, 6, 1, 0, 0);
+        c.wgpu_render_pass_draw(rpass, total_tiles * 6, 1, 0, 0);
 
         c.wgpu_render_pass_end_pass(rpass);
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);

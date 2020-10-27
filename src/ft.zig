@@ -31,6 +31,7 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
         .tex_size = tex_size,
         .u = undefined,
     };
+    out.u.glyph_height = font_size;
 
     var i: u8 = 0;
     while (i < 128) : (i += 1) {

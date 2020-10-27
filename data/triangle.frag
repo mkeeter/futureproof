@@ -1,7 +1,6 @@
 #version 450
 #pragma shader_stage(fragment)
 #extension GL_EXT_scalar_block_layout : require
-
 #include "extern/futureproof.h"
 
 layout(location=0) in  vec2 v_tex_coords;

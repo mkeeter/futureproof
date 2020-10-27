@@ -92,7 +92,7 @@ pub fn main() anyerror!void {
 
     ////////////////////////////////////////////////////////////////////////////
     // Create and upload the font atlas texture
-    const font = try ft.build_atlas(std.heap.c_allocator, "font/Inconsolata-Regular.ttf", 64, 512);
+    const font = try ft.build_atlas(std.heap.c_allocator, "font/Inconsolata-Regular.ttf", 40, 512);
     const tex_size = (c.WGPUExtent3d){
         .width = @intCast(u32, font.tex_size),
         .height = @intCast(u32, font.tex_size),
@@ -344,7 +344,7 @@ pub fn main() anyerror!void {
                 .channel = (c.WGPUPassChannel_Color){
                     .load_op = @intToEnum(c.WGPULoadOp, c.WGPULoadOp_Clear),
                     .store_op = @intToEnum(c.WGPUStoreOp, c.WGPUStoreOp_Store),
-                    .clear_value = (c.WGPUColor){ .r = 0.0, .g = 1.0, .b = 0.0, .a = 1.0 },
+                    .clear_value = (c.WGPUColor){ .r = 0.0, .g = 0.0, .b = 0.0, .a = 1.0 },
                     .read_only = false,
                 },
             },

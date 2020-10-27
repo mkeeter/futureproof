@@ -174,11 +174,10 @@ pub fn main() anyerror!void {
             .visibility = c.WGPUShaderStage_FRAGMENT,
             .ty = c.WGPUBindingType_Sampler,
 
-            .multisampled = false,
-            .view_dimension = @intToEnum(c.WGPUTextureViewDimension, c.WGPUTextureViewDimension_D2),
-            .texture_component_type = @intToEnum(c.WGPUTextureComponentType, c.WGPUTextureComponentType_Uint),
-            .storage_texture_format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_R8Unorm),
-
+            .multisampled = undefined,
+            .view_dimension = undefined,
+            .texture_component_type = undefined,
+            .storage_texture_format = undefined,
             .count = undefined,
             .has_dynamic_offset = undefined,
             .min_buffer_binding_size = undefined,

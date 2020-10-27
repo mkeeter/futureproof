@@ -40,6 +40,10 @@ export fn adapter_cb(received: c.WGPUAdapterId, data: ?*c_void) void {
     @ptrCast(*c.WGPUAdapterId, @alignCast(8, data)).* = received;
 }
 
+export fn size_cb(window: ?*c.GLFWwindow, width: c_int, height: c_int) void {
+    // TODO: redraw here, so that it scales with redraw
+}
+
 pub fn main() anyerror!void {
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});
@@ -52,6 +56,8 @@ pub fn main() anyerror!void {
         const err = c.glfwGetError(&err_str);
         std.debug.panic("Failed to open window: {} ({})", .{ err, err_str });
     }
+
+    _ = c.glfwSetWindowSizeCallback(window, size_cb);
 
     ////////////////////////////////////////////////////////////////////////////
     // WGPU initial setup

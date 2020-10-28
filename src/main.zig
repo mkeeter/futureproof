@@ -49,7 +49,7 @@ pub fn main() anyerror!void {
         std.debug.panic("Could not initialize glfw", .{});
     }
 
-    const window = c.glfwCreateWindow(640, 480, "hello", null, null);
+    const window = c.glfwCreateWindow(640, 480, "futureproof", null, null);
     defer c.glfwDestroyWindow(window);
     if (window == null) {
         var err_str: [*c]u8 = null;

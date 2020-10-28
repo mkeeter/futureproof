@@ -1,7 +1,7 @@
 all:
 	@echo "Usage: make [wgpu|shaderc]"
 
-.PHONY: wgpu shaderc
+.PHONY: wgpu shaderc nvim
 
 WGPU=wgpu-macos-64-release.zip
 wgpu:
@@ -15,3 +15,7 @@ shaderc:
 	tar -xvzf ${SHADERC}
 	rm ${SHADERC}
 	mv install shaderc
+
+nvim:
+	git clone --depth 1 --branch v0.4.4 git@github.com:neovim/neovim
+	cd neovim && make libnvim

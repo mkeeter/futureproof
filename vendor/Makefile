@@ -18,4 +18,4 @@ shaderc:
 
 nvim:
 	git clone --depth 1 --branch v0.4.4 git@github.com:neovim/neovim
-	cd neovim && make libnvim
+	cd neovim && make && make libnvim

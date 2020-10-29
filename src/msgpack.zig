@@ -11,7 +11,28 @@ const HashType = union(enum) {
     Boolean: bool,
     RawString: []u8,
     RawData: []u8,
+
+    fn bytes(s: HashType) []const u8 {
+        return switch (s) {
+            .Int, .UInt, .Boolean => std.mem.asBytes(&s),
+            .RawString, .RawData => |data| data,
+        };
+    }
+
+    fn eql(a: HashType, b: HashType) bool {
+        if (@as(@TagType(HashType), a) != b) {
+            return false;
+        } else {
+            return std.mem.eql(u8, a.bytes(), b.bytes());
+        }
+    }
+
+    fn hash(s: HashType) u64 {
+        return std.hash.Wyhash.hash(0, s.bytes());
+    }
 };
+
+const KeyValueMap = std.hash_map.HashMap(HashType, Type, HashType.hash, HashType.eql, std.hash_map.DefaultMaxLoadPercentage);
 
 const Type = union(enum) {
     Int: i64,
@@ -22,7 +43,7 @@ const Type = union(enum) {
     RawString: []u8,
     RawData: []u8,
     Array: []Type,
-    Map: std.AutoHashMap(HashType, Type), // non-string keys are unimplemented
+    Map: KeyValueMap,
     Extension: void, // unimplemented
 
     pub fn to_hash_type(self: Type) anyerror!HashType {
@@ -85,7 +106,7 @@ fn decode_array_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decode
 }
 
 fn decode_map_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decoded {
-    var out = std.AutoHashMap(HashType, Type).init(alloc);
+    var out = KeyValueMap.init(alloc);
     var j: usize = 0;
     var offset: usize = 0;
     while (j < n) : (j += 1) {

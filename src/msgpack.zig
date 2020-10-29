@@ -1,5 +1,18 @@
 const std = @import("std");
 
+const MsgPackError = error{
+    InvalidKeyType,
+    NoExtensionsAllowed,
+};
+
+const HashType = union(enum) {
+    Int: i64,
+    UInt: u64,
+    Boolean: bool,
+    RawString: []u8,
+    RawData: []u8,
+};
+
 const Type = union(enum) {
     Int: i64,
     UInt: u64,
@@ -9,27 +22,25 @@ const Type = union(enum) {
     RawString: []u8,
     RawData: []u8,
     Array: []Type,
-    Map: std.AutoHashMap([]u8, Type), // non-string keys are unimplemented
+    Map: std.AutoHashMap(HashType, Type), // non-string keys are unimplemented
     Extension: void, // unimplemented
+
+    pub fn to_hash_type(self: Type) anyerror!HashType {
+        return switch (self) {
+            .Int => HashType{ .Int = self.Int },
+            .UInt => HashType{ .UInt = self.UInt },
+            .Boolean => HashType{ .Boolean = self.Boolean },
+            .RawString => HashType{ .RawString = self.RawString },
+            .RawData => HashType{ .RawData = self.RawData },
+            else => MsgPackError.InvalidKeyType,
+        };
+    }
 };
 
 const Decoded = struct {
     data: Type,
     offset: usize,
 };
-
-export fn tester() i32 {
-    const t = decode(std.heap.c_allocator, "OMG") catch |err| {
-        std.debug.print("oh no: {}\n", .{err});
-        return 0;
-    };
-
-    if (t.data.Int == 13) {
-        return 1;
-    } else {
-        return 12;
-    }
-}
 
 fn generic_type(comptime T: type) type {
     return struct {
@@ -41,14 +52,18 @@ fn generic_type(comptime T: type) type {
 fn decode_generic(comptime T: type, data: []const u8) !generic_type(T) {
     var out: T = undefined;
     @memcpy(@ptrCast([*]u8, &out), data.ptr, @sizeOf(T));
+    if (T != f32 and T != f64) {
+        out = std.mem.bigToNative(T, out);
+        // TODO: byteswap floats as well?
+    }
     return generic_type(T){ .data = out, .offset = @sizeOf(T) };
 }
 
 fn decode_bin(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !Decoded {
     var offset: usize = 0;
-    var n: T = undefined;
-    @memcpy(@ptrCast([*]u8, &n), data.ptr, @sizeOf(T));
-    offset += @sizeOf(T);
+    const d = try decode_generic(T, data);
+    const n = d.data;
+    offset += d.offset;
     var out = try alloc.dupe(u8, data[offset..(offset + n)]);
     offset += n;
     return Decoded{ .data = Type{ .RawData = out }, .offset = offset };
@@ -70,7 +85,7 @@ fn decode_array_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decode
 }
 
 fn decode_map_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decoded {
-    var out = std.AutoHashMap([]u8, Type).init(alloc);
+    var out = std.AutoHashMap(HashType, Type).init(alloc);
     var j: usize = 0;
     var offset: usize = 0;
     while (j < n) : (j += 1) {
@@ -79,10 +94,8 @@ fn decode_map_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decoded 
         const v = try decode(alloc, data[offset..]);
         offset += v.offset;
 
-        if (k.data != Type.RawString) {
-            std.debug.panic("Can only map strings for now, not {}", .{k});
-        }
-        try out.put(k.data.RawString, v.data);
+        const k_ = try k.data.to_hash_type();
+        try out.put(k_, v.data);
     }
     return Decoded{
         .data = Type{ .Map = out },
@@ -91,29 +104,30 @@ fn decode_map_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decoded 
 }
 
 fn decode_array(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !Decoded {
-    const n = try decode_generic(T, data);
-    const out = try decode_array_n(alloc, n.data, data[n.offset..]);
+    const d = try decode_generic(T, data);
+    const n = d.data;
+    const out = try decode_array_n(alloc, n, data[d.offset..]);
     return Decoded{
         .data = out.data,
-        .offset = n.offset + out.offset,
+        .offset = d.offset + out.offset,
     };
 }
 
 fn decode_map(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !Decoded {
-    const n = try decode_generic(T, data);
-    const out = try decode_map_n(alloc, n.data, data[n.offset..]);
+    const d = try decode_generic(T, data);
+    const n = d.data;
+    const out = try decode_map_n(alloc, n, data[d.offset..]);
     return Decoded{
         .data = out.data,
-        .offset = n.offset + out.offset,
+        .offset = d.offset + out.offset,
     };
 }
 
 pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
-    var i: usize = 0;
     const c = data[0];
     var offset: usize = 1;
     const t = switch (c) {
-        0x00...0x7f => Type{ .Int = @intCast(i64, i & 0x7F) },
+        0x00...0x7f => Type{ .Int = @intCast(i64, c & 0x7F) },
 
         0x80...0x8f => fixmap: {
             const n = c & 0xF;
@@ -130,7 +144,7 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
         },
 
         0xa0...0xbf => fixstr: {
-            const n = c & 0xF;
+            const n = c & 0x1F;
             var out = try alloc.dupe(u8, data[offset..(offset + n)]);
             offset += n;
             break :fixstr Type{ .RawString = out };
@@ -155,7 +169,7 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
             offset += out.offset;
             break :bin32 out.data;
         },
-        0xc7...0xc9 => std.debug.panic("Extensions not supported\n", .{}),
+        0xc7...0xc9 => return MsgPackError.NoExtensionsAllowed,
         0xca => f32: {
             const out = try decode_generic(f32, data[offset..]);
             offset += out.offset;

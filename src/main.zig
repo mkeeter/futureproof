@@ -53,7 +53,7 @@ pub fn main() anyerror!void {
     const buf = try std.heap.c_allocator.alloc(u8, 1024 * 32);
     const len = try std.io.getStdIn().read(buf);
     const msgpack_value = msgpack.decode(std.heap.c_allocator, buf);
-    std.debug.print("Got decoded value: {}", .{msgpack_value});
+    std.debug.print("Got decoded value: {}\n", .{msgpack_value});
 
     const window = c.glfwCreateWindow(640, 480, "futureproof", null, null);
     defer c.glfwDestroyWindow(window);

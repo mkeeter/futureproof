@@ -4,7 +4,6 @@ const std = @import("std");
 const c = @import("c.zig");
 const shaderc = @import("shaderc.zig");
 const ft = @import("ft.zig");
-const msgpack = @import("msgpack.zig");
 
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
     const platform = builtin.os.tag;
@@ -49,11 +48,6 @@ pub fn main() anyerror!void {
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});
     }
-
-    const buf = try std.heap.c_allocator.alloc(u8, 1024 * 32);
-    const len = try std.io.getStdIn().read(buf);
-    const msgpack_value = msgpack.decode(std.heap.c_allocator, buf);
-    std.debug.print("Got decoded value: {}\n", .{msgpack_value});
 
     const window = c.glfwCreateWindow(640, 480, "futureproof", null, null);
     defer c.glfwDestroyWindow(window);

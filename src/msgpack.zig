@@ -3,38 +3,40 @@ const std = @import("std");
 const MsgPackError = error{
     InvalidKeyType,
     NoExtensionsAllowed,
+    NotAMap,
+    NoSuchKey,
 };
 
-const HashType = union(enum) {
+pub const Key = union(enum) {
     Int: i64,
     UInt: u64,
     Boolean: bool,
-    RawString: []u8,
-    RawData: []u8,
+    RawString: []const u8,
+    RawData: []const u8,
 
-    fn bytes(s: HashType) []const u8 {
+    fn bytes(s: Key) []const u8 {
         return switch (s) {
             .Int, .UInt, .Boolean => std.mem.asBytes(&s),
             .RawString, .RawData => |data| data,
         };
     }
 
-    fn eql(a: HashType, b: HashType) bool {
-        if (@as(@TagType(HashType), a) != b) {
+    fn eql(a: Key, b: Key) bool {
+        if (@as(@TagType(Key), a) != b) {
             return false;
         } else {
             return std.mem.eql(u8, a.bytes(), b.bytes());
         }
     }
 
-    fn hash(s: HashType) u64 {
+    fn hash(s: Key) u64 {
         return std.hash.Wyhash.hash(0, s.bytes());
     }
 };
 
-const KeyValueMap = std.hash_map.HashMap(HashType, Type, HashType.hash, HashType.eql, std.hash_map.DefaultMaxLoadPercentage);
+const KeyValueMap = std.hash_map.HashMap(Key, Value, Key.hash, Key.eql, std.hash_map.DefaultMaxLoadPercentage);
 
-const Type = union(enum) {
+pub const Value = union(enum) {
     Int: i64,
     UInt: u64,
     Nil: void,
@@ -42,24 +44,37 @@ const Type = union(enum) {
     Float: f64,
     RawString: []u8,
     RawData: []u8,
-    Array: []Type,
+    Array: []Value,
     Map: KeyValueMap,
     Extension: void, // unimplemented
 
-    pub fn to_hash_type(self: Type) anyerror!HashType {
+    pub fn get(self: Value, k: []const u8) !Value {
+        switch (self) {
+            .Map => |map| {
+                const entry = map.getEntry(Key{ .RawString = k });
+                if (entry) |e| {
+                    return e.value;
+                }
+                return MsgPackError.NoSuchKey;
+            },
+            else => return MsgPackError.NotAMap,
+        }
+    }
+
+    fn to_hash_key(self: Value) !Key {
         return switch (self) {
-            .Int => HashType{ .Int = self.Int },
-            .UInt => HashType{ .UInt = self.UInt },
-            .Boolean => HashType{ .Boolean = self.Boolean },
-            .RawString => HashType{ .RawString = self.RawString },
-            .RawData => HashType{ .RawData = self.RawData },
+            .Int => Key{ .Int = self.Int },
+            .UInt => Key{ .UInt = self.UInt },
+            .Boolean => Key{ .Boolean = self.Boolean },
+            .RawString => Key{ .RawString = self.RawString },
+            .RawData => Key{ .RawData = self.RawData },
             else => MsgPackError.InvalidKeyType,
         };
     }
 };
 
 const Decoded = struct {
-    data: Type,
+    data: Value,
     offset: usize,
 };
 
@@ -87,11 +102,11 @@ fn decode_bin(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !De
     offset += d.offset;
     var out = try alloc.dupe(u8, data[offset..(offset + n)]);
     offset += n;
-    return Decoded{ .data = Type{ .RawData = out }, .offset = offset };
+    return Decoded{ .data = Value{ .RawData = out }, .offset = offset };
 }
 
 fn decode_array_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decoded {
-    var out = try alloc.alloc(Type, n);
+    var out = try alloc.alloc(Value, n);
     var j: usize = 0;
     var offset: usize = 0;
     while (j < n) : (j += 1) {
@@ -100,7 +115,7 @@ fn decode_array_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decode
         out[j] = d.data;
     }
     return Decoded{
-        .data = Type{ .Array = out },
+        .data = Value{ .Array = out },
         .offset = offset,
     };
 }
@@ -115,11 +130,11 @@ fn decode_map_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decoded 
         const v = try decode(alloc, data[offset..]);
         offset += v.offset;
 
-        const k_ = try k.data.to_hash_type();
+        const k_ = try k.data.to_hash_key();
         try out.put(k_, v.data);
     }
     return Decoded{
-        .data = Type{ .Map = out },
+        .data = Value{ .Map = out },
         .offset = offset,
     };
 }
@@ -148,7 +163,7 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
     const c = data[0];
     var offset: usize = 1;
     const t = switch (c) {
-        0x00...0x7f => Type{ .Int = @intCast(i64, c & 0x7F) },
+        0x00...0x7f => Value{ .Int = @intCast(i64, c & 0x7F) },
 
         0x80...0x8f => fixmap: {
             const n = c & 0xF;
@@ -168,13 +183,13 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
             const n = c & 0x1F;
             var out = try alloc.dupe(u8, data[offset..(offset + n)]);
             offset += n;
-            break :fixstr Type{ .RawString = out };
+            break :fixstr Value{ .RawString = out };
         },
 
-        0xc0 => Type{ .Nil = {} },
+        0xc0 => Value{ .Nil = {} },
         // 0xc1 is unused
-        0xc2 => Type{ .Boolean = false },
-        0xc3 => Type{ .Boolean = true },
+        0xc2 => Value{ .Boolean = false },
+        0xc3 => Value{ .Boolean = true },
         0xc4 => bin8: {
             const out = try decode_bin(u8, alloc, data[offset..]);
             offset += out.offset;
@@ -194,90 +209,71 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
         0xca => f32: {
             const out = try decode_generic(f32, data[offset..]);
             offset += out.offset;
-            break :f32 Type{ .Float = out.data };
+            break :f32 Value{ .Float = out.data };
         },
         0xcb => f64: {
             const out = try decode_generic(f64, data[offset..]);
             offset += out.offset;
-            break :f64 Type{ .Float = out.data };
+            break :f64 Value{ .Float = out.data };
         },
         0xcc => u8: {
             const out = try decode_generic(u8, data[offset..]);
             offset += out.offset;
-            break :u8 Type{ .UInt = out.data };
+            break :u8 Value{ .UInt = out.data };
         },
         0xcd => u16: {
             const out = try decode_generic(u16, data[offset..]);
             offset += out.offset;
-            break :u16 Type{ .UInt = out.data };
+            break :u16 Value{ .UInt = out.data };
         },
         0xce => u32: {
             const out = try decode_generic(u32, data[offset..]);
             offset += out.offset;
-            break :u32 Type{ .UInt = out.data };
+            break :u32 Value{ .UInt = out.data };
         },
         0xcf => u64: {
             const out = try decode_generic(u64, data[offset..]);
             offset += out.offset;
-            break :u64 Type{ .UInt = out.data };
+            break :u64 Value{ .UInt = out.data };
         },
         0xd0 => i8: {
             const out = try decode_generic(i8, data[offset..]);
             offset += out.offset;
-            break :i8 Type{ .Int = out.data };
+            break :i8 Value{ .Int = out.data };
         },
         0xd1 => i16: {
             const out = try decode_generic(i16, data[offset..]);
             offset += out.offset;
-            break :i16 Type{ .Int = out.data };
+            break :i16 Value{ .Int = out.data };
         },
         0xd2 => i32: {
             const out = try decode_generic(i32, data[offset..]);
             offset += out.offset;
-            break :i32 Type{ .Int = out.data };
+            break :i32 Value{ .Int = out.data };
         },
         0xd3 => i64: {
             const out = try decode_generic(i64, data[offset..]);
             offset += out.offset;
-            break :i64 Type{ .Int = out.data };
+            break :i64 Value{ .Int = out.data };
         },
 
         // TODO: all the fixext
-        0xd4 => fixext1: {
-            offset += 2;
-            break :fixext1 Type{ .Nil = {} };
-        },
-        0xd5 => fixext2: {
-            offset += 3;
-            break :fixext2 Type{ .Nil = {} };
-        },
-        0xd6 => fixext4: {
-            offset += 5;
-            break :fixext4 Type{ .Nil = {} };
-        },
-        0xd7 => fixext8: {
-            offset += 9;
-            break :fixext8 Type{ .Nil = {} };
-        },
-        0xd8 => fixext16: {
-            offset += 17;
-            break :fixext16 Type{ .Nil = {} };
-        },
+        0xd4...0xd8 => return MsgPackError.NoExtensionsAllowed,
 
         0xd9 => str8: {
             const out = try decode_bin(u8, alloc, data[offset..]);
             offset += out.offset;
-            break :str8 Type{ .RawString = out.data.RawData };
+            break :str8 Value{ .RawString = out.data.RawData };
         },
         0xda => str16: {
             const out = try decode_bin(u16, alloc, data[offset..]);
             offset += out.offset;
-            break :str16 Type{ .RawString = out.data.RawData };
+            break :str16 Value{ .RawString = out.data.RawData };
         },
         0xdb => str32: {
             const out = try decode_bin(u32, alloc, data[offset..]);
             offset += out.offset;
-            break :str32 Type{ .RawString = out.data.RawData };
+            break :str32 Value{ .RawString = out.data.RawData };
         },
 
         0xdc => array16: {
@@ -301,9 +297,9 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
             break :map32 n.data;
         },
 
-        0xe0...0xff => Type{ .Int = @bitCast(i8, c) },
+        0xe0...0xff => Value{ .Int = @bitCast(i8, c) },
 
-        else => Type{ .Nil = {} },
+        else => Value{ .Nil = {} },
     };
     return Decoded{
         .data = t,

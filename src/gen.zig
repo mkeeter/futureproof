@@ -9,7 +9,7 @@ pub fn main() anyerror!void {
     const alloc = std.heap.c_allocator;
 
     const cmd = [_][]const u8{
-        "nvim", "--api-info",
+        "./vendor/neovim/build/bin/nvim", "--api-info",
     };
     const r = try std.ChildProcess.exec(.{
         .allocator = alloc,

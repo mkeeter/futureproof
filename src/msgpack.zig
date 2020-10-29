@@ -80,7 +80,7 @@ fn decode_map_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decoded 
         offset += v.offset;
 
         if (k.data != Type.RawString) {
-            std.debug.panic("Can only map strings for now", .{});
+            std.debug.panic("Can only map strings for now, not {}", .{k});
         }
         try out.put(k.data.RawString, v.data);
     }
@@ -108,7 +108,7 @@ fn decode_map(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !De
     };
 }
 
-fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
+pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
     var i: usize = 0;
     const c = data[0];
     var offset: usize = 1;
@@ -130,7 +130,7 @@ fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
         },
 
         0xa0...0xbf => fixstr: {
-            const n = c & 0x1F;
+            const n = c & 0xF;
             var out = try alloc.dupe(u8, data[offset..(offset + n)]);
             offset += n;
             break :fixstr Type{ .RawString = out };

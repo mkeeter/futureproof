@@ -4,6 +4,7 @@ const std = @import("std");
 const c = @import("c.zig");
 const shaderc = @import("shaderc.zig");
 const ft = @import("ft.zig");
+const msgpack = @import("msgpack.zig");
 
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
     const platform = builtin.os.tag;
@@ -45,6 +46,11 @@ export fn size_cb(window: ?*c.GLFWwindow, width: c_int, height: c_int) void {
 }
 
 pub fn main() anyerror!void {
+    const v = msgpack.Value{ .Int = 1 };
+    const stdout = std.io.getStdOut();
+    const writer = stdout.writer();
+    try v.serialize(std.fs.File.Writer, writer);
+
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});
     }

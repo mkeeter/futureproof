@@ -71,6 +71,23 @@ pub const Value = union(enum) {
             else => MsgPackError.InvalidKeyType,
         };
     }
+
+    pub fn serialize(self: Value, comptime T: type, out: T) !void {
+        switch (self) {
+            .Int => |i| {
+                switch (i) {
+                    0x00...0x7f => _ = try out.write(&std.mem.toBytes(@intCast(i8, i))),
+                    0x80...0xff => {
+                        _ = try out.writeByte(0xd0);
+                        _ = try out.write(&std.mem.toBytes(@intCast(i8, i)));
+                    },
+                    else => std.debug.panic("invalid int\n", .{}),
+                }
+            },
+            else => std.debug.panic("Not implemented\n", .{}),
+        }
+        return out.writeByte('a');
+    }
 };
 
 const Decoded = struct {

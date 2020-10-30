@@ -77,6 +77,7 @@ pub const Value = union(enum) {
                 }
             },
             std.builtin.TypeId.Array => {
+                const n = v.len;
                 @compileError("Cannot encode arrays yet");
             },
             else => {
@@ -84,6 +85,8 @@ pub const Value = union(enum) {
             },
         }
         return switch (T) {
+            Value => v,
+            Key => v.to_value(),
             i8, i16, i32, i64, comptime_int => Value{ .Int = v },
             u8, u16, u32, u64 => Value{ .UInt = v },
             void => Value{ .Nil = {} },

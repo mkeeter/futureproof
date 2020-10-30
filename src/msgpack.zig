@@ -5,6 +5,7 @@ const MsgPackError = error{
     NoExtensionsAllowed,
     NotAMap,
     NoSuchKey,
+    InvalidValueType,
 };
 
 pub const Key = union(enum) {
@@ -58,6 +59,40 @@ pub const Value = union(enum) {
     Array: []Value,
     Map: KeyValueMap,
     Extension: void, // unimplemented
+
+    pub fn encode(v: anytype) !Value {
+        const T = @TypeOf(v);
+        switch (@typeInfo(T)) {
+            std.builtin.TypeId.Pointer => |ptr| {
+                const Size = std.builtin.TypeInfo.Pointer.Size;
+                switch (ptr.size) {
+                    Size.One, Size.Slice => {
+                        // Dereference and recurse
+                        // (coerces to an array in the case of constant strings)
+                        const child_type: type = ptr.child;
+                        const x: child_type = @as(child_type, v.*);
+                        return Value.encode(x);
+                    },
+                    else => @compileError("Cannot encode generic pointer"),
+                }
+            },
+            std.builtin.TypeId.Array => {
+                @compileError("Cannot encode arrays yet");
+            },
+            else => {
+                // Fall through to switch statement below
+            },
+        }
+        return switch (T) {
+            i8, i16, i32, i64, comptime_int => Value{ .Int = v },
+            u8, u16, u32, u64 => Value{ .UInt = v },
+            void => Value{ .Nil = {} },
+            bool => Value{ .Boolean = v },
+            f32 => Value{ .Float32 = v },
+            f64, comptime_float => Value{ .Float64 = v },
+            else => @compileError("Cannot encode type " ++ @typeName(T)),
+        };
+    }
 
     pub fn get(self: Value, k: []const u8) !Value {
         switch (self) {

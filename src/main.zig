@@ -51,10 +51,11 @@ pub fn main() anyerror!void {
     const writer = stdout.writer();
     try v.serialize(writer);
 
-    _ = try msgpack.Value.encode(1);
-    _ = try msgpack.Value.encode(false);
-    _ = try msgpack.Value.encode("HI");
-    _ = try msgpack.Value.encode(1.23);
+    const alloc = std.heap.c_allocator;
+    _ = try msgpack.Value.encode(alloc, 1);
+    _ = try msgpack.Value.encode(alloc, false);
+    _ = try msgpack.Value.encode(alloc, "HI");
+    _ = try msgpack.Value.encode(alloc, 1.23);
 
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});

@@ -60,7 +60,7 @@ pub const Value = union(enum) {
     Map: KeyValueMap,
     Extension: void, // unimplemented
 
-    pub fn encode(v: anytype) !Value {
+    pub fn encode(alloc: *std.mem.Allocator, v: anytype) !Value {
         const T = @TypeOf(v);
         switch (@typeInfo(T)) {
             std.builtin.TypeId.Pointer => |ptr| {
@@ -71,14 +71,23 @@ pub const Value = union(enum) {
                         // (coerces to an array in the case of constant strings)
                         const child_type: type = ptr.child;
                         const x: child_type = @as(child_type, v.*);
-                        return Value.encode(x);
+                        return Value.encode(alloc, x);
                     },
                     else => @compileError("Cannot encode generic pointer"),
                 }
             },
-            std.builtin.TypeId.Array => {
-                const n = v.len;
-                @compileError("Cannot encode arrays yet");
+            std.builtin.TypeId.Array => |array| {
+                // Special case to encode strings instead of Array(u8)
+                if (array.child == u8) {
+                    return Value{ .RawString = &v };
+                } else {
+                    const out = try alloc.alloc(Value, v.len);
+                    var i: u32 = 0;
+                    while (i < array.len) : (i += 1) {
+                        out[i] = try encode(alloc, v[i]);
+                    }
+                    return Value{ .Array = out };
+                }
             },
             else => {
                 // Fall through to switch statement below

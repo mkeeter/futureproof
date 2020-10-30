@@ -49,7 +49,7 @@ pub fn main() anyerror!void {
     const v = msgpack.Value{ .Int = 1 };
     const stdout = std.io.getStdOut();
     const writer = stdout.writer();
-    try v.serialize(std.fs.File.Writer, writer);
+    try v.serialize(writer);
 
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});

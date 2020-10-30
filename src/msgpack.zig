@@ -14,9 +14,9 @@ pub const Key = union(enum) {
     RawString: []const u8,
     RawData: []const u8,
 
-    fn bytes(s: Key) []const u8 {
-        return switch (s) {
-            .Int, .UInt, .Boolean => std.mem.asBytes(&s),
+    fn bytes(self: Key) []const u8 {
+        return switch (self) {
+            .Int, .UInt, .Boolean => std.mem.asBytes(&self),
             .RawString, .RawData => |data| data,
         };
     }
@@ -29,8 +29,18 @@ pub const Key = union(enum) {
         }
     }
 
-    fn hash(s: Key) u64 {
-        return std.hash.Wyhash.hash(0, s.bytes());
+    fn hash(self: Key) u64 {
+        return std.hash.Wyhash.hash(0, self.bytes());
+    }
+
+    fn to_value(self: Key) Value {
+        return switch (self) {
+            .Int => Value{ .Int = self.Int },
+            .UInt => Value{ .UInt = self.UInt },
+            .Boolean => Value{ .Boolean = self.Boolean },
+            .RawString => Value{ .RawString = self.RawString },
+            .RawData => Value{ .RawData = self.RawData },
+        };
     }
 };
 
@@ -41,9 +51,10 @@ pub const Value = union(enum) {
     UInt: u64,
     Nil: void,
     Boolean: bool,
-    Float: f64,
-    RawString: []u8,
-    RawData: []u8,
+    Float32: f32,
+    Float64: f64,
+    RawString: []const u8,
+    RawData: []const u8,
     Array: []Value,
     Map: KeyValueMap,
     Extension: void, // unimplemented
@@ -72,19 +83,174 @@ pub const Value = union(enum) {
         };
     }
 
-    pub fn serialize(self: Value, comptime T: type, out: T) !void {
+    // out should implement the Writer interface
+    pub fn serialize(self: Value, out: anytype) anyerror!void {
         switch (self) {
             .Int => |i| {
                 switch (i) {
-                    0x00...0x7f => _ = try out.write(&std.mem.toBytes(@intCast(i8, i))),
-                    0x80...0xff => {
+                    // Negative fixnum
+                    -32...-1 => _ = try out.write(&std.mem.toBytes(@intCast(i8, i))),
+                    // i8
+                    0...std.math.maxInt(i8), std.math.minInt(i8)...-33 => {
                         _ = try out.writeByte(0xd0);
                         _ = try out.write(&std.mem.toBytes(@intCast(i8, i)));
                     },
-                    else => std.debug.panic("invalid int\n", .{}),
+                    // i16
+                    (std.math.maxInt(i8) + 1)...std.math.maxInt(i16), std.math.minInt(i16)...(std.math.minInt(i8) - 1) => {
+                        _ = try out.writeByte(0xd1);
+                        const j = std.mem.nativeToBig(i16, @intCast(i16, i));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    // i32
+                    (std.math.maxInt(i16) + 1)...std.math.maxInt(i32), std.math.minInt(i32)...(std.math.minInt(i16) - 1) => {
+                        _ = try out.writeByte(0xd2);
+                        const j = std.mem.nativeToBig(i32, @intCast(i32, i));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    // i64
+                    (std.math.maxInt(i32) + 1)...std.math.maxInt(i64), std.math.minInt(i64)...(std.math.minInt(i32) - 1) => {
+                        _ = try out.writeByte(0xd3);
+                        const j = std.mem.nativeToBig(i64, @intCast(i64, i));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
                 }
             },
-            else => std.debug.panic("Not implemented\n", .{}),
+
+            .UInt => |u| {
+                switch (u) {
+                    // Positive fixnum
+                    0x00...0x7f => _ = try out.write(&std.mem.toBytes(@intCast(u8, u))),
+                    // u8
+                    0x80...std.math.maxInt(u8) => {
+                        _ = try out.writeByte(0xcc);
+                        _ = try out.write(&std.mem.toBytes(@intCast(u8, u)));
+                    },
+                    // u16
+                    (std.math.maxInt(u8) + 1)...std.math.maxInt(u16) => {
+                        _ = try out.writeByte(0xcd);
+                        const j = std.mem.nativeToBig(u16, @intCast(u16, u));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    // u32
+                    (std.math.maxInt(u16) + 1)...std.math.maxInt(u32) => {
+                        _ = try out.writeByte(0xce);
+                        const j = std.mem.nativeToBig(u32, @intCast(u32, u));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    // u64
+                    (std.math.maxInt(u32) + 1)...std.math.maxInt(u64) => {
+                        _ = try out.writeByte(0xcf);
+                        const j = std.mem.nativeToBig(u64, @intCast(u64, u));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                }
+            },
+
+            .Nil => _ = try out.writeByte(0xc0),
+            .Boolean => |b| {
+                _ = try out.writeByte(if (b) 0xc3 else 0xc2);
+            },
+            .Float32 => |f| {
+                _ = try out.writeByte(0xca);
+                _ = try out.write(&std.mem.toBytes(f));
+            },
+            .Float64 => |d| {
+                _ = try out.writeByte(0xcb);
+                _ = try out.write(&std.mem.toBytes(d));
+            },
+
+            .RawString => |s| {
+                switch (s.len) {
+                    0x00...0x1f => {
+                        _ = try out.writeByte(0b101_00000 | @intCast(u8, s.len));
+                    },
+                    0x20...std.math.maxInt(u8) => {
+                        _ = try out.writeByte(0xd9);
+                        _ = try out.writeByte(@intCast(u8, s.len));
+                    },
+                    std.math.maxInt(u8) + 1...std.math.maxInt(u16) => {
+                        _ = try out.writeByte(0xda);
+                        const j = std.mem.nativeToBig(u16, @intCast(u16, s.len));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    std.math.maxInt(u16) + 1...std.math.maxInt(u32) => {
+                        _ = try out.writeByte(0xda);
+                        const j = std.mem.nativeToBig(u32, @intCast(u32, s.len));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    else => std.debug.panic("String is too large: {} > {}\n", .{ s.len, std.math.maxInt(u32) }),
+                }
+                _ = try out.write(s);
+            },
+
+            .RawData => |d| {
+                switch (d.len) {
+                    0x00...std.math.maxInt(u8) => {
+                        _ = try out.writeByte(0xc4);
+                        _ = try out.writeByte(@intCast(u8, d.len));
+                    },
+                    std.math.maxInt(u8) + 1...std.math.maxInt(u16) => {
+                        _ = try out.writeByte(0xc5);
+                        const j = std.mem.nativeToBig(u16, @intCast(u16, d.len));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    std.math.maxInt(u16) + 1...std.math.maxInt(u32) => {
+                        _ = try out.writeByte(0xc6);
+                        const j = std.mem.nativeToBig(u32, @intCast(u32, d.len));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    else => std.debug.panic("Data is too large: {} > {}\n", .{ d.len, std.math.maxInt(u32) }),
+                }
+                _ = try out.write(d);
+            },
+
+            .Array => |a| {
+                switch (a.len) {
+                    0x00...0x0f => {
+                        _ = try out.writeByte(0b1001_0000 | @intCast(u8, a.len));
+                    },
+                    0x10...std.math.maxInt(u16) => {
+                        _ = try out.writeByte(0xdc);
+                        const j = std.mem.nativeToBig(u16, @intCast(u16, a.len));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    std.math.maxInt(u16) + 1...std.math.maxInt(u32) => {
+                        _ = try out.writeByte(0xdd);
+                        const j = std.mem.nativeToBig(u32, @intCast(u32, a.len));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    else => std.debug.panic("Array is too large: {} > {}\n", .{ a.len, std.math.maxInt(u32) }),
+                }
+                for (a) |v| {
+                    try v.serialize(out);
+                }
+            },
+
+            .Map => |m| {
+                const count = m.count();
+                switch (count) {
+                    0x00...0x0f => {
+                        _ = try out.writeByte(0b1000_0000 | @intCast(u8, count));
+                    },
+                    0x10...std.math.maxInt(u16) => {
+                        _ = try out.writeByte(0xde);
+                        const j = std.mem.nativeToBig(u16, @intCast(u16, count));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    std.math.maxInt(u16) + 1...std.math.maxInt(u32) => {
+                        _ = try out.writeByte(0xdf);
+                        const j = std.mem.nativeToBig(u32, @intCast(u32, count));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                }
+                var itr = m.iterator();
+                while (itr.next()) |entry| {
+                    try entry.key.to_value().serialize(out);
+                    try entry.value.serialize(out);
+                }
+            },
+
+            .Extension => std.debug.panic("Not implemented\n", .{}),
         }
         return out.writeByte('a');
     }
@@ -180,7 +346,7 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
     const c = data[0];
     var offset: usize = 1;
     const t = switch (c) {
-        0x00...0x7f => Value{ .Int = @intCast(i64, c & 0x7F) },
+        0x00...0x7f => Value{ .UInt = @intCast(u64, c & 0x7F) },
 
         0x80...0x8f => fixmap: {
             const n = c & 0xF;
@@ -226,12 +392,12 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
         0xca => f32: {
             const out = try decode_generic(f32, data[offset..]);
             offset += out.offset;
-            break :f32 Value{ .Float = out.data };
+            break :f32 Value{ .Float32 = out.data };
         },
         0xcb => f64: {
             const out = try decode_generic(f64, data[offset..]);
             offset += out.offset;
-            break :f64 Value{ .Float = out.data };
+            break :f64 Value{ .Float64 = out.data };
         },
         0xcc => u8: {
             const out = try decode_generic(u8, data[offset..]);

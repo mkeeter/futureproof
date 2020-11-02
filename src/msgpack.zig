@@ -45,7 +45,13 @@ pub const Key = union(enum) {
     }
 };
 
-const KeyValueMap = std.hash_map.HashMap(Key, Value, Key.hash, Key.eql, std.hash_map.DefaultMaxLoadPercentage);
+const KeyValueMap = std.hash_map.HashMap(
+    Key,
+    Value,
+    Key.hash,
+    Key.eql,
+    std.hash_map.DefaultMaxLoadPercentage,
+);
 
 pub const Value = union(enum) {
     Int: i64,
@@ -143,19 +149,25 @@ pub const Value = union(enum) {
                         _ = try out.write(&std.mem.toBytes(@intCast(i8, i)));
                     },
                     // i16
-                    (std.math.maxInt(i8) + 1)...std.math.maxInt(i16), std.math.minInt(i16)...(std.math.minInt(i8) - 1) => {
+                    (std.math.maxInt(i8) + 1)...std.math.maxInt(i16),
+                    std.math.minInt(i16)...(std.math.minInt(i8) - 1),
+                    => {
                         _ = try out.writeByte(0xd1);
                         const j = std.mem.nativeToBig(i16, @intCast(i16, i));
                         _ = try out.write(&std.mem.toBytes(j));
                     },
                     // i32
-                    (std.math.maxInt(i16) + 1)...std.math.maxInt(i32), std.math.minInt(i32)...(std.math.minInt(i16) - 1) => {
+                    (std.math.maxInt(i16) + 1)...std.math.maxInt(i32),
+                    std.math.minInt(i32)...(std.math.minInt(i16) - 1),
+                    => {
                         _ = try out.writeByte(0xd2);
                         const j = std.mem.nativeToBig(i32, @intCast(i32, i));
                         _ = try out.write(&std.mem.toBytes(j));
                     },
                     // i64
-                    (std.math.maxInt(i32) + 1)...std.math.maxInt(i64), std.math.minInt(i64)...(std.math.minInt(i32) - 1) => {
+                    (std.math.maxInt(i32) + 1)...std.math.maxInt(i64),
+                    std.math.minInt(i64)...(std.math.minInt(i32) - 1),
+                    => {
                         _ = try out.writeByte(0xd3);
                         const j = std.mem.nativeToBig(i64, @intCast(i64, i));
                         _ = try out.write(&std.mem.toBytes(j));
@@ -225,7 +237,10 @@ pub const Value = union(enum) {
                         const j = std.mem.nativeToBig(u32, @intCast(u32, s.len));
                         _ = try out.write(&std.mem.toBytes(j));
                     },
-                    else => std.debug.panic("String is too large: {} > {}\n", .{ s.len, std.math.maxInt(u32) }),
+                    else => std.debug.panic(
+                        "String is too large: {} > {}\n",
+                        .{ s.len, std.math.maxInt(u32) },
+                    ),
                 }
                 _ = try out.write(s);
             },
@@ -246,7 +261,10 @@ pub const Value = union(enum) {
                         const j = std.mem.nativeToBig(u32, @intCast(u32, d.len));
                         _ = try out.write(&std.mem.toBytes(j));
                     },
-                    else => std.debug.panic("Data is too large: {} > {}\n", .{ d.len, std.math.maxInt(u32) }),
+                    else => std.debug.panic(
+                        "Data is too large: {} > {}\n",
+                        .{ d.len, std.math.maxInt(u32) },
+                    ),
                 }
                 _ = try out.write(d);
             },
@@ -266,7 +284,10 @@ pub const Value = union(enum) {
                         const j = std.mem.nativeToBig(u32, @intCast(u32, a.len));
                         _ = try out.write(&std.mem.toBytes(j));
                     },
-                    else => std.debug.panic("Array is too large: {} > {}\n", .{ a.len, std.math.maxInt(u32) }),
+                    else => std.debug.panic(
+                        "Array is too large: {} > {}\n",
+                        .{ a.len, std.math.maxInt(u32) },
+                    ),
                 }
                 for (a) |v| {
                     try v.serialize(out);

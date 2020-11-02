@@ -5,6 +5,7 @@ const c = @import("c.zig");
 const shaderc = @import("shaderc.zig");
 const ft = @import("ft.zig");
 const msgpack = @import("msgpack.zig");
+const blocking_queue = @import("blocking_queue.zig");
 
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
     const platform = builtin.os.tag;
@@ -56,6 +57,10 @@ pub fn main() anyerror!void {
     _ = try msgpack.Value.encode(alloc, false);
     _ = try msgpack.Value.encode(alloc, "HI");
     _ = try msgpack.Value.encode(alloc, 1.23);
+
+    var q = blocking_queue.BlockingQueue(i32).init(alloc);
+    try q.put(12);
+    std.debug.print("{}", .{q.get()});
 
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});
@@ -332,14 +337,30 @@ pub fn main() anyerror!void {
             };
             std.debug.print("Resized to {} {}\n", .{ width, height });
 
-            swap_chain = c.wgpu_device_create_swap_chain(device, surface, &(c.WGPUSwapChainDescriptor){
-                .usage = c.WGPUTextureUsage_OUTPUT_ATTACHMENT,
-                .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_Bgra8Unorm),
-                .width = u.width_px,
-                .height = u.height_px,
-                .present_mode = @intToEnum(c.WGPUPresentMode, c.WGPUPresentMode_Fifo),
-            });
-            c.wgpu_queue_write_buffer(queue, uniform_buffer, 0, @ptrCast([*c]const u8, &u), @sizeOf(c.fpUniforms));
+            swap_chain = c.wgpu_device_create_swap_chain(
+                device,
+                surface,
+                &(c.WGPUSwapChainDescriptor){
+                    .usage = c.WGPUTextureUsage_OUTPUT_ATTACHMENT,
+                    .format = @intToEnum(
+                        c.WGPUTextureFormat,
+                        c.WGPUTextureFormat_Bgra8Unorm,
+                    ),
+                    .width = u.width_px,
+                    .height = u.height_px,
+                    .present_mode = @intToEnum(
+                        c.WGPUPresentMode,
+                        c.WGPUPresentMode_Fifo,
+                    ),
+                },
+            );
+            c.wgpu_queue_write_buffer(
+                queue,
+                uniform_buffer,
+                0,
+                @ptrCast([*c]const u8, &u),
+                @sizeOf(c.fpUniforms),
+            );
         }
 
         const next_texture = c.wgpu_swap_chain_get_next_texture(swap_chain);
@@ -347,7 +368,10 @@ pub fn main() anyerror!void {
             std.debug.panic("Cannot acquire next swap chain texture", .{});
         }
 
-        const cmd_encoder = c.wgpu_device_create_command_encoder(device, &(c.WGPUCommandEncoderDescriptor){ .label = "command encoder" });
+        const cmd_encoder = c.wgpu_device_create_command_encoder(
+            device,
+            &(c.WGPUCommandEncoderDescriptor){ .label = "command encoder" },
+        );
 
         const color_attachments = [_]c.WGPURenderPassColorAttachmentDescriptor{
             (c.WGPURenderPassColorAttachmentDescriptor){
@@ -356,17 +380,25 @@ pub fn main() anyerror!void {
                 .channel = (c.WGPUPassChannel_Color){
                     .load_op = @intToEnum(c.WGPULoadOp, c.WGPULoadOp_Clear),
                     .store_op = @intToEnum(c.WGPUStoreOp, c.WGPUStoreOp_Store),
-                    .clear_value = (c.WGPUColor){ .r = 0.0, .g = 0.0, .b = 0.0, .a = 1.0 },
+                    .clear_value = (c.WGPUColor){
+                        .r = 0.0,
+                        .g = 0.0,
+                        .b = 0.0,
+                        .a = 1.0,
+                    },
                     .read_only = false,
                 },
             },
         };
 
-        const rpass = c.wgpu_command_encoder_begin_render_pass(cmd_encoder, &(c.WGPURenderPassDescriptor){
-            .color_attachments = &color_attachments,
-            .color_attachments_length = color_attachments.len,
-            .depth_stencil_attachment = null,
-        });
+        const rpass = c.wgpu_command_encoder_begin_render_pass(
+            cmd_encoder,
+            &(c.WGPURenderPassDescriptor){
+                .color_attachments = &color_attachments,
+                .color_attachments_length = color_attachments.len,
+                .depth_stencil_attachment = null,
+            },
+        );
 
         c.wgpu_render_pass_set_pipeline(rpass, render_pipeline);
         c.wgpu_render_pass_set_bind_group(rpass, 0, bind_group, null, 0);

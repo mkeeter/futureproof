@@ -11,7 +11,7 @@ pub fn BlockingQueue(comptime T: type) type {
         pub const Self = @This();
 
         pub fn init(alloc: *std.mem.Allocator) Self {
-            return Self{
+            return .{
                 .inner = std.atomic.Queue(T).init(),
                 .event = std.ResetEvent.init(),
                 .alloc = alloc,

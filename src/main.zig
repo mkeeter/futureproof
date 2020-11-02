@@ -48,25 +48,14 @@ export fn size_cb(window: ?*c.GLFWwindow, width: c_int, height: c_int) void {
 }
 
 pub fn main() anyerror!void {
-    const v = msgpack.Value{ .Int = 1 };
-    const stdout = std.io.getStdOut();
-    const writer = stdout.writer();
-    try v.serialize(writer);
-
     const alloc = std.heap.c_allocator;
-    _ = try msgpack.Value.encode(alloc, 1);
-    _ = try msgpack.Value.encode(alloc, false);
-    _ = try msgpack.Value.encode(alloc, "HI");
-    _ = try msgpack.Value.encode(alloc, 1.23);
-
-    var q = blocking_queue.BlockingQueue(i32).init(alloc);
-    try q.put(12);
-    std.debug.print("{}", .{q.get()});
 
     const nvim_cmd = [_][]const u8{
         "./vendor/neovim/build/bin/nvim", "--embed",
     };
     var nvim = try rpc.RPC.init(&nvim_cmd, alloc);
+    const reply = try nvim.call("nvim_ui_attach", .{ 80, 80, msgpack.KeyValueMap.init(alloc) });
+    std.debug.print("reply: .{}\n", .{reply});
 
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});

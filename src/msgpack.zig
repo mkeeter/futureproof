@@ -45,7 +45,7 @@ pub const Key = union(enum) {
     }
 };
 
-const KeyValueMap = std.hash_map.HashMap(
+pub const KeyValueMap = std.hash_map.HashMap(
     Key,
     Value,
     Key.hash,
@@ -72,24 +72,41 @@ pub const Value = union(enum) {
             std.builtin.TypeId.Pointer => |ptr| {
                 const Size = std.builtin.TypeInfo.Pointer.Size;
                 switch (ptr.size) {
-                    Size.One, Size.Slice => {
+                    Size.One => {
                         // Dereference and recurse
                         // (coerces to an array in the case of constant strings)
                         const child_type: type = ptr.child;
                         const x: child_type = @as(child_type, v.*);
                         return Value.encode(alloc, x);
                     },
+                    Size.Slice => {
+                        // Special case to encode strings instead of Array(u8)
+                        if (ptr.child == u8) {
+                            return Value{ .RawString = v };
+                        } else {
+                            const out = try alloc.alloc(Value, v.len);
+                            var i: u32 = 0;
+                            while (i < ptr.len) : (i += 1) {
+                                out[i] = try encode(alloc, v[i]);
+                            }
+                            return Value{ .Array = out };
+                        }
+                    },
                     else => @compileError("Cannot encode generic pointer"),
                 }
             },
             std.builtin.TypeId.Array => |array| {
-                // Special case to encode strings instead of Array(u8)
-                if (array.child == u8) {
-                    return Value{ .RawString = &v };
+                // Coerce to slice
+                const x: []const array.child = &v;
+                return encode(alloc, &x);
+            },
+            std.builtin.TypeId.Struct => |st| {
+                if (@TypeOf(v) == KeyValueMap) {
+                    return Value{ .Map = v };
                 } else {
-                    const out = try alloc.alloc(Value, v.len);
-                    var i: u32 = 0;
-                    while (i < array.len) : (i += 1) {
+                    const out = try alloc.alloc(Value, st.fields.len);
+                    comptime var i: u32 = 0;
+                    inline while (i < st.fields.len) : (i += 1) {
                         out[i] = try encode(alloc, v[i]);
                     }
                     return Value{ .Array = out };
@@ -103,7 +120,7 @@ pub const Value = union(enum) {
             Value => v,
             Key => v.to_value(),
             i8, i16, i32, i64, comptime_int => Value{ .Int = v },
-            u8, u16, u32, u64 => Value{ .UInt = v },
+            u8, u16, u32, u64, usize => Value{ .UInt = v },
             void => Value{ .Nil = {} },
             bool => Value{ .Boolean = v },
             f32 => Value{ .Float32 = v },
@@ -320,7 +337,6 @@ pub const Value = union(enum) {
 
             .Extension => std.debug.panic("Not implemented\n", .{}),
         }
-        return out.writeByte('a');
     }
 };
 

@@ -6,6 +6,7 @@ const shaderc = @import("shaderc.zig");
 const ft = @import("ft.zig");
 const msgpack = @import("msgpack.zig");
 const blocking_queue = @import("blocking_queue.zig");
+const rpc = @import("rpc.zig");
 
 fn get_surface(window: ?*c.GLFWwindow) c.WGPUSurfaceId {
     const platform = builtin.os.tag;
@@ -61,6 +62,11 @@ pub fn main() anyerror!void {
     var q = blocking_queue.BlockingQueue(i32).init(alloc);
     try q.put(12);
     std.debug.print("{}", .{q.get()});
+
+    const nvim_cmd = [_][]const u8{
+        "./vendor/neovim/build/bin/nvim", "--embed",
+    };
+    var nvim = try rpc.RPC.init(&nvim_cmd, alloc);
 
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});

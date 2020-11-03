@@ -13,6 +13,7 @@ pub const Window = struct {
     height: c_int,
     total_tiles: u32,
 
+    font: ft.Atlas,
     tex: c.WGPUTextureId,
     tex_view: c.WGPUTextureViewId,
     tex_sampler: c.WGPUSamplerId,
@@ -20,7 +21,10 @@ pub const Window = struct {
     swap_chain: c.WGPUSwapChainId,
 
     device: c.WGPUDeviceId,
+    surface: c.WGPUSurfaceId,
     uniform_buffer: c.WGPUBufferId,
+
+    queue: c.WGPUQueueId,
 
     bind_group: c.WGPUBindGroupId,
     render_pipeline: c.WGPURenderPipelineId,
@@ -302,11 +306,18 @@ pub const Window = struct {
             .width = 0,
             .height = 0,
             .total_tiles = undefined,
+
+            .font = font,
             .tex = tex,
             .tex_view = tex_view,
             .tex_sampler = tex_sampler,
+
             .swap_chain = undefined, // assigned in check_size below
             .device = device,
+            .surface = surface,
+
+            .queue = queue,
+
             .uniform_buffer = uniform_buffer,
             .bind_group = bind_group,
             .render_pipeline = render_pipeline,
@@ -357,8 +368,8 @@ pub const Window = struct {
 
         c.wgpu_render_pass_end_pass(rpass);
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);
-        c.wgpu_queue_submit(queue, &cmd_buf, 1);
-        c.wgpu_swap_chain_present(swap_chain);
+        c.wgpu_queue_submit(self.queue, &cmd_buf, 1);
+        c.wgpu_swap_chain_present(self.swap_chain);
     }
 
     pub fn deinit(self: *Self) void {
@@ -381,15 +392,15 @@ pub const Window = struct {
         }
         self.width = width;
         self.height = height;
-        const x_tiles = @intCast(u32, width) / font.u.glyph_advance;
-        const y_tiles = @intCast(u32, height) / font.u.glyph_height;
+        const x_tiles = @intCast(u32, width) / self.font.u.glyph_advance;
+        const y_tiles = @intCast(u32, height) / self.font.u.glyph_height;
         self.total_tiles = x_tiles * y_tiles;
         const u = (c.fpUniforms){
             .width_px = @intCast(u32, width),
             .height_px = @intCast(u32, height),
             .x_tiles = x_tiles,
             .y_tiles = y_tiles,
-            .font = font.u,
+            .font = self.font.u,
         };
         std.debug.print("Resized to {} {}\n", .{ width, height });
 
@@ -411,7 +422,7 @@ pub const Window = struct {
             },
         );
         c.wgpu_queue_write_buffer(
-            c.wgpu_device_get_default_queue(self.device),
+            self.queue,
             self.uniform_buffer,
             0,
             @ptrCast([*c]const u8, &u),

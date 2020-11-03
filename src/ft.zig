@@ -1,7 +1,7 @@
 const std = @import("std");
 const c = @import("c.zig");
 
-const Atlas = struct {
+pub const Atlas = struct {
     u: c.fpAtlasUniforms,
     tex: []u8,
     tex_size: u32,

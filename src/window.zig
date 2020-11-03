@@ -9,6 +9,7 @@ pub const Window = struct {
     const Self = @This();
 
     window: *c.GLFWwindow,
+
     width: c_int,
     height: c_int,
     total_tiles: u32,
@@ -22,12 +23,15 @@ pub const Window = struct {
 
     device: c.WGPUDeviceId,
     surface: c.WGPUSurfaceId,
-    uniform_buffer: c.WGPUBufferId,
 
     queue: c.WGPUQueueId,
 
     bind_group: c.WGPUBindGroupId,
+    bind_group_layout: c.WGPUBindGroupLayoutId,
+    uniform_buffer: c.WGPUBufferId,
+
     render_pipeline: c.WGPURenderPipelineId,
+    pipeline_layout: c.WGPUPipelineLayoutId,
 
     pub fn init(width: u32, height: u32, name: []const u8) !Self {
         const window = c.glfwCreateWindow(640, 480, "futureproof", null, null);
@@ -37,6 +41,12 @@ pub const Window = struct {
             const err = c.glfwGetError(&err_str);
             std.debug.panic("Failed to open window: {} ({})", .{ err, err_str });
         }
+
+        // We'll use an arena for transient CPU-side resources
+        // (e.g. SPIR-V buffers, textures)
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        const alloc: *std.mem.Allocator = &arena.allocator;
+        defer arena.deinit();
 
         // Extract the WGPU Surface from the platform-specific window
         const platform = builtin.os.tag;
@@ -82,7 +92,7 @@ pub const Window = struct {
 
         ////////////////////////////////////////////////////////////////////////////
         // Build the shaders using shaderc
-        const vert_spv = shaderc.build_shader_from_file(std.heap.c_allocator, "data/triangle.vert") catch |err| {
+        const vert_spv = shaderc.build_shader_from_file(alloc, "data/triangle.vert") catch |err| {
             std.debug.panic("Could not open file", .{});
         };
         const vert_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
@@ -90,7 +100,7 @@ pub const Window = struct {
             .length = vert_spv.len,
         });
 
-        const frag_spv = shaderc.build_shader_from_file(std.heap.c_allocator, "data/triangle.frag") catch |err| {
+        const frag_spv = shaderc.build_shader_from_file(alloc, "data/triangle.frag") catch |err| {
             std.debug.panic("Could not open file", .{});
         };
         const frag_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
@@ -100,7 +110,12 @@ pub const Window = struct {
 
         ////////////////////////////////////////////////////////////////////////////
         // Create and upload the font atlas texture
-        const font = try ft.build_atlas(std.heap.c_allocator, "font/Inconsolata-Regular.ttf", 40, 512);
+        const font = try ft.build_atlas(
+            alloc,
+            "font/Inconsolata-Regular.ttf",
+            40,
+            512,
+        );
         const tex_size = (c.WGPUExtent3d){
             .width = @intCast(u32, font.tex_size),
             .height = @intCast(u32, font.tex_size),
@@ -303,9 +318,10 @@ pub const Window = struct {
 
         return Window{
             .window = window orelse unreachable,
-            .width = 0,
-            .height = 0,
-            .total_tiles = undefined,
+
+            .width = -1,
+            .height = -1,
+            .total_tiles = undefined, // assigned in check_size below
 
             .font = font,
             .tex = tex,
@@ -313,14 +329,18 @@ pub const Window = struct {
             .tex_sampler = tex_sampler,
 
             .swap_chain = undefined, // assigned in check_size below
+
             .device = device,
             .surface = surface,
 
             .queue = queue,
 
-            .uniform_buffer = uniform_buffer,
             .bind_group = bind_group,
+            .bind_group_layout = bind_group_layout,
+            .uniform_buffer = uniform_buffer,
+
             .render_pipeline = render_pipeline,
+            .pipeline_layout = pipeline_layout,
         };
     }
 
@@ -373,10 +393,17 @@ pub const Window = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        c.glfwDestroyWindow(self.window);
         c.wgpu_texture_destroy(self.tex);
         c.wgpu_texture_view_destroy(self.tex_view);
         c.wgpu_sampler_destroy(self.tex_sampler);
+
+        c.wgpu_bind_group_destroy(self.bind_group);
+        c.wgpu_bind_group_layout_destroy(self.bind_group_layout);
+        c.wgpu_buffer_destroy(self.uniform_buffer);
+
+        c.wgpu_pipeline_layout_destroy(self.pipeline_layout);
+
+        c.glfwDestroyWindow(self.window);
     }
 
     pub fn should_close(self: *Self) bool {

@@ -26,6 +26,7 @@ pub fn main() anyerror!void {
     }
 
     var w = try window.Window.init(640, 480, "futureproof");
+    defer w.deinit();
 
     while (!w.should_close()) {
         w.check_size();

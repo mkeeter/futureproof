@@ -489,13 +489,10 @@ pub const Window = struct {
         );
 
         // TODO: this shouldn'be in resize
-        const txt = "HELLO WORLD";
-        var txt_buf: [txt.len]u32 = undefined;
-        {
-            var i: u32 = 0;
-            while (i < txt.len) : (i += 1) {
-                txt_buf[i] = txt[i];
-            }
+        var txt_buf: [256]u32 = undefined;
+        var i: u32 = 0;
+        while (i < 256) : (i += 1) {
+            txt_buf[i] = @intCast(u32, i);
         }
         c.wgpu_queue_write_buffer(
             self.queue,

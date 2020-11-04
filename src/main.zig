@@ -33,7 +33,9 @@ pub fn main() anyerror!void {
         w.redraw();
 
         if (nvim.listener.event_queue.try_get()) |event| {
-            std.debug.print("Got event .{}\n", .{event});
+            for (event.Array[2].Array) |cmd| {
+                std.debug.print("Got cmd .{}\n", .{cmd.Array[0]});
+            }
         }
 
         c.glfwWaitEvents();

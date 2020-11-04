@@ -1,3 +1,5 @@
+// Rough implementation of msgpack, based on the standard online at
+// https://github.com/msgpack/msgpack/blob/master/spec.md
 const std = @import("std");
 
 const MsgPackError = error{

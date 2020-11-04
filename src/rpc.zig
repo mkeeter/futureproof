@@ -1,3 +1,5 @@
+// This is a rough implementation of the msgpack-rpc standard, online at
+// https://github.com/msgpack-rpc/msgpack-rpc/blob/master/spec.md
 const std = @import("std");
 
 const msgpack = @import("msgpack.zig");

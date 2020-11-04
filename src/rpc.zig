@@ -42,18 +42,18 @@ pub const RPC = struct {
     msgid: u32,
 
     pub fn init(argv: []const []const u8, alloc: *std.mem.Allocator) !RPC {
-        const c = try std.ChildProcess.init(argv, alloc);
-        c.stdin_behavior = .Pipe;
-        c.stdout_behavior = .Pipe;
-        try c.spawn();
+        const child = try std.ChildProcess.init(argv, alloc);
+        child.stdin_behavior = .Pipe;
+        child.stdout_behavior = .Pipe;
+        try child.spawn();
 
-        const out = (c.stdin orelse std.debug.panic("Could not get stdout", .{})).writer();
+        const out = (child.stdin orelse std.debug.panic("Could not get stdout", .{})).writer();
 
         const listener = try alloc.create(Listener);
         listener.* = .{
             .event_queue = RPCQueue.init(alloc),
             .response_queue = RPCQueue.init(alloc),
-            .input = (c.stdout orelse std.debug.panic("Could not get stdout", .{})).reader(),
+            .input = (child.stdout orelse std.debug.panic("Could not get stdout", .{})).reader(),
             .alloc = alloc,
         };
 
@@ -63,7 +63,7 @@ pub const RPC = struct {
         const rpc = .{
             .listener = listener,
             .output = out,
-            .process = c,
+            .process = child,
             .alloc = alloc,
             .msgid = 0,
         };

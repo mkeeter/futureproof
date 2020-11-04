@@ -50,8 +50,6 @@ pub fn BlockingQueue(comptime T: type) type {
             }
         }
 
-        // This isn't safe when mixed with blocking get() calls, because it
-        // doesn't maintain the event flag state.
         pub fn try_get(self: *Self) ?T {
             if (self.inner.get()) |node| {
                 defer self.alloc.destroy(node);

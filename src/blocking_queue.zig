@@ -31,10 +31,34 @@ pub fn BlockingQueue(comptime T: type) type {
 
         pub fn get(self: *Self) T {
             self.event.wait();
-            self.event.reset();
+
             const node = self.inner.get() orelse std.debug.panic("Could not get node", .{});
             defer self.alloc.destroy(node);
+            self.check_flag();
+
             return node.data;
+        }
+
+        fn check_flag(self: *Self) void {
+            const lock = self.inner.mutex.acquire();
+            defer lock.release();
+
+            // Manually check the state of the queue, as isEmpty() would
+            // also try to lock the mutex, causing a deadlock
+            if (self.inner.head == null) {
+                self.event.reset();
+            }
+        }
+
+        // This isn't safe when mixed with blocking get() calls, because it
+        // doesn't maintain the event flag state.
+        pub fn try_get(self: *Self) ?T {
+            if (self.inner.get()) |node| {
+                defer self.alloc.destroy(node);
+                self.check_flag();
+                return node.data;
+            }
+            return null;
         }
     };
 }

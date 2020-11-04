@@ -2,6 +2,7 @@
 // https://github.com/msgpack-rpc/msgpack-rpc/blob/master/spec.md
 const std = @import("std");
 
+const c = @import("c.zig");
 const msgpack = @import("msgpack.zig");
 const blocking_queue = @import("blocking_queue.zig");
 
@@ -25,10 +26,12 @@ const Listener = struct {
             if (v.data.Array[0].UInt == RPC_TYPE_RESPONSE) {
                 try self.response_queue.put(v.data);
             } else if (v.data.Array[0].UInt == RPC_TYPE_NOTIFICATION) {
-                for (v.data.Array[2].Array) |arr| {
-                    std.debug.print("{}\n", .{arr.Array[0]});
-                }
+                try self.event_queue.put(v.data);
+                c.glfwPostEmptyEvent();
             }
+            // TODO: shift data in the buffer over, in case it contained
+            // another msgpack message
+            std.debug.assert(v.offset == in);
         }
     }
 };

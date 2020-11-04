@@ -32,6 +32,10 @@ pub fn main() anyerror!void {
         w.check_size();
         w.redraw();
 
+        if (nvim.listener.event_queue.try_get()) |event| {
+            std.debug.print("Got event .{}\n", .{event});
+        }
+
         c.glfwWaitEvents();
     }
 }

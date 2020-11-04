@@ -29,6 +29,7 @@ pub const Window = struct {
     bind_group: c.WGPUBindGroupId,
     bind_group_layout: c.WGPUBindGroupLayoutId,
     uniform_buffer: c.WGPUBufferId,
+    char_grid_buffer: c.WGPUBufferId,
 
     render_pipeline: c.WGPURenderPipelineId,
     pipeline_layout: c.WGPUPipelineLayoutId,
@@ -177,6 +178,12 @@ pub const Window = struct {
             .usage = c.WGPUBufferUsage_UNIFORM | c.WGPUBufferUsage_COPY_DST,
             .mapped_at_creation = false,
         });
+        const char_grid_buffer = c.wgpu_device_create_buffer(device, &(c.WGPUBufferDescriptor){
+            .label = "Character grid",
+            .size = @sizeOf(u32) * 512 * 512,
+            .usage = c.WGPUBufferUsage_STORAGE | c.WGPUBufferUsage_COPY_DST,
+            .mapped_at_creation = false,
+        });
 
         ////////////////////////////////////////////////////////////////////////////
         // Bind groups (?!)
@@ -222,6 +229,20 @@ pub const Window = struct {
                 .storage_texture_format = undefined,
                 .count = undefined,
             },
+            (c.WGPUBindGroupLayoutEntry){
+                .binding = 3,
+                .visibility = c.WGPUShaderStage_VERTEX,
+                .ty = c.WGPUBindingType_StorageBuffer,
+
+                .has_dynamic_offset = false,
+                .min_buffer_binding_size = 0,
+
+                .multisampled = undefined,
+                .view_dimension = undefined,
+                .texture_component_type = undefined,
+                .storage_texture_format = undefined,
+                .count = undefined,
+            },
         };
         const bind_group_layout = c.wgpu_device_create_bind_group_layout(device, &(c.WGPUBindGroupLayoutDescriptor){
             .label = "bind group layout",
@@ -252,6 +273,15 @@ pub const Window = struct {
                 .buffer = uniform_buffer,
                 .offset = 0,
                 .size = @sizeOf(c.fpUniforms),
+
+                .sampler = 0, // None
+                .texture_view = 0, // None
+            },
+            (c.WGPUBindGroupEntry){
+                .binding = 3,
+                .buffer = char_grid_buffer,
+                .offset = 0,
+                .size = @sizeOf(u32) * 512 * 512,
 
                 .sampler = 0, // None
                 .texture_view = 0, // None
@@ -338,6 +368,7 @@ pub const Window = struct {
             .bind_group = bind_group,
             .bind_group_layout = bind_group_layout,
             .uniform_buffer = uniform_buffer,
+            .char_grid_buffer = char_grid_buffer,
 
             .render_pipeline = render_pipeline,
             .pipeline_layout = pipeline_layout,
@@ -400,6 +431,7 @@ pub const Window = struct {
         c.wgpu_bind_group_destroy(self.bind_group);
         c.wgpu_bind_group_layout_destroy(self.bind_group_layout);
         c.wgpu_buffer_destroy(self.uniform_buffer);
+        c.wgpu_buffer_destroy(self.char_grid_buffer);
 
         c.wgpu_pipeline_layout_destroy(self.pipeline_layout);
 
@@ -454,6 +486,23 @@ pub const Window = struct {
             0,
             @ptrCast([*c]const u8, &u),
             @sizeOf(c.fpUniforms),
+        );
+
+        // TODO: this shouldn'be in resize
+        const txt = "HELLO WORLD";
+        var txt_buf: [txt.len]u32 = undefined;
+        {
+            var i: u32 = 0;
+            while (i < txt.len) : (i += 1) {
+                txt_buf[i] = txt[i];
+            }
+        }
+        c.wgpu_queue_write_buffer(
+            self.queue,
+            self.char_grid_buffer,
+            0,
+            @ptrCast([*c]const u8, &txt_buf),
+            txt_buf.len * @sizeOf(u32),
         );
     }
 };

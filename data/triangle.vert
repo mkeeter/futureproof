@@ -6,6 +6,9 @@
 layout(set=0, binding=2, std430) uniform Uniforms {
     fpUniforms u;
 };
+layout(set=0, binding=3) buffer CharGrid {
+    uint[] char_grid;
+};
 
 layout(location=0) out vec2 v_tex_coords;
 layout(location=1) out flat uint v_ascii;
@@ -33,7 +36,7 @@ void main() {
     ivec2 tile = ivec2(tile_id % u.x_tiles, tile_id / u.x_tiles);
 
     v_ascii = random(tile); // 'a', hardcoded for now
-    fpGlyph glyph = u.font.glyphs[v_ascii];
+    fpGlyph glyph = u.font.glyphs[char_grid[tile_id]];
 
     // Pixel position (0 to width_px, 0 to height_px)
     ivec2 p = tile * ivec2(u.font.glyph_advance, u.font.glyph_height) +

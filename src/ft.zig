@@ -24,7 +24,7 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
     var y: u32 = 1;
     var max_height: u32 = 0;
 
-    const tex = try std.heap.c_allocator.alloc(u8, tex_size * tex_size);
+    const tex = try alloc.alloc(u8, tex_size * tex_size);
     std.mem.set(u8, tex, 128);
     var out = Atlas{
         .tex = tex,

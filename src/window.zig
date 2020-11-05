@@ -12,6 +12,8 @@ pub const Window = struct {
 
     width: c_int,
     height: c_int,
+    x_tiles: u32,
+    y_tiles: u32,
     total_tiles: u32,
 
     font: ft.Atlas,
@@ -351,6 +353,8 @@ pub const Window = struct {
 
             .width = -1,
             .height = -1,
+            .x_tiles = undefined,
+            .y_tiles = undefined,
             .total_tiles = undefined, // assigned in check_size below
 
             .font = font,
@@ -442,6 +446,16 @@ pub const Window = struct {
         return c.glfwWindowShouldClose(self.window) != 0;
     }
 
+    pub fn update_grid(self: *Self, char_grid: []u32) void {
+        c.wgpu_queue_write_buffer(
+            self.queue,
+            self.char_grid_buffer,
+            0,
+            @ptrCast([*c]const u8, char_grid.ptr),
+            char_grid.len * @sizeOf(u32),
+        );
+    }
+
     pub fn check_size(self: *Self) void {
         var width: c_int = undefined;
         var height: c_int = undefined;
@@ -451,14 +465,14 @@ pub const Window = struct {
         }
         self.width = width;
         self.height = height;
-        const x_tiles = @intCast(u32, width) / self.font.u.glyph_advance;
-        const y_tiles = @intCast(u32, height) / self.font.u.glyph_height;
-        self.total_tiles = x_tiles * y_tiles;
+        self.x_tiles = @intCast(u32, width) / self.font.u.glyph_advance;
+        self.y_tiles = @intCast(u32, height) / self.font.u.glyph_height;
+        self.total_tiles = self.x_tiles * self.y_tiles;
         const u = (c.fpUniforms){
-            .width_px = @intCast(u32, width),
-            .height_px = @intCast(u32, height),
-            .x_tiles = x_tiles,
-            .y_tiles = y_tiles,
+            .width_px = @intCast(u32, self.width),
+            .height_px = @intCast(u32, self.height),
+            .x_tiles = self.x_tiles,
+            .y_tiles = self.y_tiles,
             .font = self.font.u,
         };
         std.debug.print("Resized to {} {}\n", .{ width, height });

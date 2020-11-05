@@ -23,7 +23,7 @@ pub fn main() anyerror!void {
         msgpack.Key{ .RawString = "ext_linegrid" },
         msgpack.Value{ .Boolean = true },
     );
-    const reply = try nvim.call("nvim_ui_attach", .{ 60, 60, options });
+    const reply = try nvim.call("nvim_ui_attach", .{ 64, 24, options });
     std.debug.print("reply: .{}\n", .{reply});
 
     if (c.glfwInit() != c.GLFW_TRUE) {
@@ -33,32 +33,59 @@ pub fn main() anyerror!void {
     var w = try window.Window.init(640, 480, "futureproof");
     defer w.deinit();
 
-    var cursor_x: u32 = 0;
-    var cursor_y: u32 = 0;
     var char_grid: [512 * 512]u32 = undefined;
     std.mem.set(u32, char_grid[0..], 0);
 
     while (!w.should_close()) {
         w.check_size();
         w.redraw();
+        std.debug.print("window: {} {}\n", .{ w.x_tiles, w.y_tiles });
 
-        while (nvim.listener.event_queue.try_get()) |event| {
+        while (nvim.get_event()) |event| {
             for (event.Array[2].Array) |cmd| {
                 if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_line")) {
                     for (cmd.Array[1..]) |v| {
                         const line = v.Array;
                         const grid = line[0].UInt;
                         const row = line[1].UInt;
-                        const col_start = line[2].UInt;
+                        var col = line[2].UInt;
+                        std.debug.print("Printing at {} {}\n    '", .{ row, col });
                         for (line[3].Array) |cell_| {
                             const cell = cell_.Array;
                             const text = cell[0].RawString;
-                            const repeat = if (cell.len >= 2) cell[1].UInt else 1;
+                            const repeat = if (cell.len >= 3) cell[2].UInt else 1;
+                            std.debug.print("{} {}\t", .{ text, repeat });
                             std.debug.assert(text.len == 1);
                             var i: usize = 0;
                             while (i < repeat) : (i += 1) {
-                                char_grid[cursor_x + cursor_y * w.x_tiles] = text[0];
-                                cursor_x += 1; // TODO: unicode?!
+                                char_grid[col + row * w.x_tiles] = text[0];
+                                col += 1; // TODO: unicode?!
+                            }
+                        }
+                        std.debug.print("'\n", .{});
+                    }
+                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_scroll")) {
+                    for (cmd.Array[1..]) |v| {
+                        const line = v.Array;
+                        const grid = line[0].UInt;
+                        const top = @intCast(i32, line[1].UInt);
+                        const bot = @intCast(i32, line[2].UInt);
+                        const left = line[3].UInt;
+                        const right = line[4].UInt;
+                        const rows = @intCast(i32, line[5].UInt);
+                        const cols = line[6].UInt;
+                        std.debug.assert(cols == 0);
+
+                        var y: i32 = if (rows > 0) (bot - rows) else (top + rows - 1);
+                        var dy: i32 = if (rows > 0) 1 else -1;
+                        var y_final: i32 = if (rows > 0) bot else (top - 1);
+                        while (y != y_final) : (y += dy) {
+                            var x = left;
+                            const y_src = @intCast(u32, y);
+                            const y_dst = @intCast(u32, y - rows);
+                            while (x < right) : (x += 1) {
+                                const char = char_grid[x + y_src * w.x_tiles];
+                                char_grid[x + y_dst * w.x_tiles] = char;
                             }
                         }
                     }
@@ -70,6 +97,7 @@ pub fn main() anyerror!void {
                     std.debug.print("Unimplemented: {}\n", .{cmd.Array[0]});
                 }
             }
+            try nvim.release_event(event);
         }
 
         c.glfwWaitEvents();

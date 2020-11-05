@@ -27,7 +27,7 @@ void main() {
     uint tile_id = gl_VertexIndex / 6;
 
     // Tile position (0 to x_tiles, 0 to y_tiles)
-    ivec2 tile = ivec2(tile_id % u.x_tiles, tile_id / u.x_tiles);
+    ivec2 tile = ivec2(tile_id % u.x_tiles, u.y_tiles - 1 - (tile_id / u.x_tiles));
 
     v_ascii = char_grid[tile_id];
     fpGlyph glyph = u.font.glyphs[v_ascii];

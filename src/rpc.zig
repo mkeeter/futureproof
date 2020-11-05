@@ -73,6 +73,14 @@ pub const RPC = struct {
         return rpc;
     }
 
+    pub fn get_event(self: *RPC) ?msgpack.Value {
+        return self.listener.event_queue.try_get();
+    }
+
+    pub fn release_event(self: *RPC, value: msgpack.Value) !void {
+        // TODO: recursively free the Value using the allocator
+    }
+
     pub fn call(self: *RPC, method: []const u8, params: anytype) !msgpack.Value {
         // We'll use an arena for the encoded message
         var arena = std.heap.ArenaAllocator.init(self.alloc);

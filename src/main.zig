@@ -18,7 +18,12 @@ pub fn main() anyerror!void {
         "./vendor/neovim/build/bin/nvim", "--embed",
     };
     var nvim = try rpc.RPC.init(&nvim_cmd, alloc);
-    const reply = try nvim.call("nvim_ui_attach", .{ 80, 80, msgpack.KeyValueMap.init(alloc) });
+    var options = msgpack.KeyValueMap.init(alloc);
+    try options.put(
+        msgpack.Key{ .RawString = "ext_linegrid" },
+        msgpack.Value{ .Boolean = true },
+    );
+    const reply = try nvim.call("nvim_ui_attach", .{ 60, 60, options });
     std.debug.print("reply: .{}\n", .{reply});
 
     if (c.glfwInit() != c.GLFW_TRUE) {
@@ -39,22 +44,30 @@ pub fn main() anyerror!void {
 
         while (nvim.listener.event_queue.try_get()) |event| {
             for (event.Array[2].Array) |cmd| {
-                std.debug.print("Got cmd .{}\n", .{cmd.Array[0]});
-                if (std.mem.eql(u8, cmd.Array[0].RawString, "cursor_goto")) {
-                    std.debug.assert(cmd.Array.len == 2);
-                    cursor_x = @intCast(u32, cmd.Array[1].Array[0].UInt);
-                    cursor_y = @intCast(u32, cmd.Array[1].Array[1].UInt);
-                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "put")) {
+                if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_line")) {
                     for (cmd.Array[1..]) |v| {
-                        for (v.Array) |u| {
-                            for (u.RawString) |char| {
-                                char_grid[cursor_x + cursor_y * w.x_tiles] = char;
+                        const line = v.Array;
+                        const grid = line[0].UInt;
+                        const row = line[1].UInt;
+                        const col_start = line[2].UInt;
+                        for (line[3].Array) |cell_| {
+                            const cell = cell_.Array;
+                            const text = cell[0].RawString;
+                            const repeat = if (cell.len >= 2) cell[1].UInt else 1;
+                            std.debug.assert(text.len == 1);
+                            var i: usize = 0;
+                            while (i < repeat) : (i += 1) {
+                                char_grid[cursor_x + cursor_y * w.x_tiles] = text[0];
                                 cursor_x += 1; // TODO: unicode?!
                             }
                         }
                     }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "flush")) {
                     w.update_grid(char_grid[0..w.total_tiles]);
+                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_clear")) {
+                    std.mem.set(u32, char_grid[0..], 0);
+                } else {
+                    std.debug.print("Unimplemented: {}\n", .{cmd.Array[0]});
                 }
             }
         }

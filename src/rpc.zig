@@ -74,8 +74,13 @@ pub const RPC = struct {
     }
 
     pub fn call(self: *RPC, method: []const u8, params: anytype) !msgpack.Value {
-        const p = try msgpack.Value.encode(self.alloc, params);
-        const v = try msgpack.Value.encode(self.alloc, .{ RPC_TYPE_REQUEST, self.msgid, method, p });
+        // We'll use an arena for the encoded message
+        var arena = std.heap.ArenaAllocator.init(self.alloc);
+        const tmp_alloc: *std.mem.Allocator = &arena.allocator;
+        defer arena.deinit();
+
+        const p = try msgpack.Value.encode(tmp_alloc, params);
+        const v = try msgpack.Value.encode(tmp_alloc, .{ RPC_TYPE_REQUEST, self.msgid, method, p });
         try v.serialize(self.output);
         const response = self.listener.response_queue.get();
 

@@ -12,7 +12,9 @@ export fn size_cb(w: ?*c.GLFWwindow, width: c_int, height: c_int) void {
 }
 
 pub fn main() anyerror!void {
-    const alloc = std.heap.c_allocator;
+    var gp_alloc = std.heap.GeneralPurposeAllocator(.{}){};
+    defer std.testing.expect(!gp_alloc.deinit());
+    const alloc: *std.mem.Allocator = &gp_alloc.allocator;
 
     const nvim_cmd = [_][]const u8{
         "./vendor/neovim/build/bin/nvim", "--embed",

@@ -34,7 +34,6 @@ pub fn build(b: *Builder) void {
     exe.install();
 
     if (exe.target.isDarwin()) {
-        exe.addFrameworkDir("/System/Library/Frameworks");
         exe.linkFramework("Foundation");
 
         const cmd = [_][]const u8{

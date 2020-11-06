@@ -78,7 +78,8 @@ pub const RPC = struct {
     }
 
     pub fn release_event(self: *RPC, value: msgpack.Value) !void {
-        // TODO: recursively free the Value using the allocator
+        var v_mut = value; // Hack
+        v_mut.deinit(self.alloc);
     }
 
     pub fn call(self: *RPC, method: []const u8, params: anytype) !msgpack.Value {

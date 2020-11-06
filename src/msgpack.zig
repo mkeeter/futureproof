@@ -68,6 +68,30 @@ pub const Value = union(enum) {
     Map: KeyValueMap,
     Extension: void, // unimplemented
 
+    pub fn deinit(self: *Value, alloc: *std.mem.Allocator) void {
+        switch (self.*) {
+            .Map => |map| {
+                var itr = map.iterator();
+                while (itr.next()) |entry| {
+                    entry.key.to_value().deinit(alloc);
+                    entry.value.deinit(alloc);
+                }
+                self.Map.deinit();
+            },
+            .RawString, .RawData => |r| {
+                alloc.free(r);
+            },
+            .Array => |arr| {
+                for (arr) |r| {
+                    var r_mut = r;
+                    r_mut.deinit(alloc);
+                }
+                alloc.free(arr);
+            },
+            else => {},
+        }
+    }
+
     pub fn encode(alloc: *std.mem.Allocator, v: anytype) !Value {
         const T = @TypeOf(v);
         switch (@typeInfo(T)) {

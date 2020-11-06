@@ -82,7 +82,7 @@ pub const RPC = struct {
     }
 
     pub fn release_event(self: *RPC, value: msgpack.Value) !void {
-        value.deinit(self.alloc);
+        value.destroy(self.alloc);
     }
 
     pub fn call(self: *RPC, method: []const u8, params: anytype) !msgpack.Value {
@@ -98,7 +98,7 @@ pub const RPC = struct {
 
         // Wait for a reply from the worker thread
         const response = self.listener.response_queue.get();
-        defer response.deinit(self.alloc);
+        defer response.destroy(self.alloc);
 
         // Check that the msgids are correct
         std.debug.assert(response.Array[1].UInt == self.msgid);

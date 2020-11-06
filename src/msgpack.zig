@@ -68,14 +68,14 @@ pub const Value = union(enum) {
     Map: KeyValueMap,
     Extension: void, // unimplemented
 
-    pub fn deinit(self: Value, alloc: *std.mem.Allocator) void {
+    pub fn destroy(self: Value, alloc: *std.mem.Allocator) void {
         var self_mut = self;
         switch (self_mut) {
             .Map => |map| {
                 var itr = map.iterator();
                 while (itr.next()) |entry| {
-                    entry.key.to_value().deinit(alloc);
-                    entry.value.deinit(alloc);
+                    entry.key.to_value().destroy(alloc);
+                    entry.value.destroy(alloc);
                 }
                 self_mut.Map.deinit();
             },
@@ -85,7 +85,7 @@ pub const Value = union(enum) {
             .Array => |arr| {
                 for (arr) |r| {
                     var r_mut = r;
-                    r_mut.deinit(alloc);
+                    r_mut.destroy(alloc);
                 }
                 alloc.free(arr);
             },

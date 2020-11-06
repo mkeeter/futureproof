@@ -22,7 +22,5 @@ struct fpAtlasUniforms {
 struct fpUniforms {
     uint32_t width_px;
     uint32_t height_px;
-    uint32_t x_tiles;
-    uint32_t y_tiles;
     MEMBER_STRUCT fpAtlasUniforms font;
 };

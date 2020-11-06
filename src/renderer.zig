@@ -27,9 +27,7 @@ pub const Renderer = struct {
     render_pipeline: c.WGPURenderPipelineId,
     pipeline_layout: c.WGPUPipelineLayoutId,
 
-    pub fn init(alloc: *std.mem.Allocator, window: *c.GLFWwindow, font: *ft.Atlas) !Self {
-        // We'll use an arena for transient CPU-side resources
-        // (e.g. SPIR-V buffers, textures)
+    pub fn init(alloc: *std.mem.Allocator, window: *c.GLFWwindow, font: *const ft.Atlas) !Self {
         var arena = std.heap.ArenaAllocator.init(alloc);
         const tmp_alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
@@ -325,21 +323,12 @@ pub const Renderer = struct {
             .alpha_to_coverage_enabled = false,
         });
 
-        return Window{
-            .window = window orelse unreachable,
-
-            .width = -1,
-            .height = -1,
-            .x_tiles = undefined,
-            .y_tiles = undefined,
-            .total_tiles = undefined, // assigned in check_size below
-
-            .font = font,
+        return Renderer{
             .tex = tex,
             .tex_view = tex_view,
             .tex_sampler = tex_sampler,
 
-            .swap_chain = undefined, // assigned in check_size below
+            .swap_chain = undefined, // assigned in resize_swap_chain below
 
             .device = device,
             .surface = surface,
@@ -356,7 +345,7 @@ pub const Renderer = struct {
         };
     }
 
-    pub fn redraw(self: *Self) void {
+    pub fn redraw(self: *Self, total_tiles: u32) void {
         const next_texture = c.wgpu_swap_chain_get_next_texture(self.swap_chain);
         if (next_texture.view_id == 0) {
             std.debug.panic("Cannot acquire next swap chain texture", .{});
@@ -396,7 +385,7 @@ pub const Renderer = struct {
 
         c.wgpu_render_pass_set_pipeline(rpass, self.render_pipeline);
         c.wgpu_render_pass_set_bind_group(rpass, 0, self.bind_group, null, 0);
-        c.wgpu_render_pass_draw(rpass, self.total_tiles * 6, 1, 0, 0);
+        c.wgpu_render_pass_draw(rpass, total_tiles * 6, 1, 0, 0);
 
         c.wgpu_render_pass_end_pass(rpass);
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);
@@ -419,10 +408,6 @@ pub const Renderer = struct {
         c.glfwDestroyWindow(self.window);
     }
 
-    pub fn should_close(self: *Self) bool {
-        return c.glfwWindowShouldClose(self.window) != 0;
-    }
-
     pub fn update_grid(self: *Self, char_grid: []u32) void {
         c.wgpu_queue_write_buffer(
             self.queue,
@@ -433,27 +418,7 @@ pub const Renderer = struct {
         );
     }
 
-    pub fn check_size(self: *Self) void {
-        var width: c_int = undefined;
-        var height: c_int = undefined;
-        c.glfwGetFramebufferSize(self.window, &width, &height);
-        if ((width == self.width) and (height == self.height)) {
-            return;
-        }
-        self.width = width;
-        self.height = height;
-        self.x_tiles = @intCast(u32, width) / self.font.u.glyph_advance;
-        self.y_tiles = @intCast(u32, height) / self.font.u.glyph_height;
-        self.total_tiles = self.x_tiles * self.y_tiles;
-        const u = (c.fpUniforms){
-            .width_px = @intCast(u32, self.width),
-            .height_px = @intCast(u32, self.height),
-            .x_tiles = self.x_tiles,
-            .y_tiles = self.y_tiles,
-            .font = self.font.u,
-        };
-        std.debug.print("Resized to {} {}\n", .{ width, height });
-
+    pub fn resize_swap_chain(self: *Self, width: u32, height: u32) void {
         self.swap_chain = c.wgpu_device_create_swap_chain(
             self.device,
             self.surface,
@@ -463,19 +428,22 @@ pub const Renderer = struct {
                     c.WGPUTextureFormat,
                     c.WGPUTextureFormat_Bgra8Unorm,
                 ),
-                .width = u.width_px,
-                .height = u.height_px,
+                .width = width,
+                .height = height,
                 .present_mode = @intToEnum(
                     c.WGPUPresentMode,
                     c.WGPUPresentMode_Fifo,
                 ),
             },
         );
+    }
+
+    pub fn update_uniforms(self: *Self, u: *const c.fpUniforms) void {
         c.wgpu_queue_write_buffer(
             self.queue,
             self.uniform_buffer,
             0,
-            @ptrCast([*c]const u8, &u),
+            @ptrCast([*c]const u8, u),
             @sizeOf(c.fpUniforms),
         );
     }

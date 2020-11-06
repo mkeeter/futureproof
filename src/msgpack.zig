@@ -68,15 +68,16 @@ pub const Value = union(enum) {
     Map: KeyValueMap,
     Extension: void, // unimplemented
 
-    pub fn deinit(self: *Value, alloc: *std.mem.Allocator) void {
-        switch (self.*) {
+    pub fn deinit(self: Value, alloc: *std.mem.Allocator) void {
+        var self_mut = self;
+        switch (self_mut) {
             .Map => |map| {
                 var itr = map.iterator();
                 while (itr.next()) |entry| {
                     entry.key.to_value().deinit(alloc);
                     entry.value.deinit(alloc);
                 }
-                self.Map.deinit();
+                self_mut.Map.deinit();
             },
             .RawString, .RawData => |r| {
                 alloc.free(r);

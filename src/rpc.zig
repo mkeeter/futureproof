@@ -21,7 +21,11 @@ const Listener = struct {
     fn run(self: *Listener) !void {
         var buf: [1024 * 32]u8 = undefined;
         while (true) {
+            std.debug.print("Reading...\n", .{});
             const in = try self.input.read(&buf);
+            if (in == 0) {
+                break;
+            }
             const v = try msgpack.decode(self.alloc, buf[0..in]);
             if (v.data.Array[0].UInt == RPC_TYPE_RESPONSE) {
                 try self.response_queue.put(v.data);
@@ -41,6 +45,7 @@ pub const RPC = struct {
 
     output: std.fs.File.Writer, // This is the stdin of the RPC subprocess
     process: *std.ChildProcess,
+    thread: *std.Thread,
     alloc: *std.mem.Allocator,
     msgid: u32,
 
@@ -60,14 +65,14 @@ pub const RPC = struct {
             .alloc = alloc,
         };
 
-        // TODO: store this somewhere?
-        const thread = std.Thread.spawn(listener, Listener.run);
+        const thread = try std.Thread.spawn(listener, Listener.run);
 
         const rpc = .{
             .listener = listener,
             .output = out,
             .process = child,
             .alloc = alloc,
+            .thread = thread,
             .msgid = 0,
         };
         return rpc;
@@ -78,8 +83,7 @@ pub const RPC = struct {
     }
 
     pub fn release_event(self: *RPC, value: msgpack.Value) !void {
-        var v_mut = value; // Hack
-        v_mut.deinit(self.alloc);
+        value.deinit(self.alloc);
     }
 
     pub fn call(self: *RPC, method: []const u8, params: anytype) !msgpack.Value {
@@ -106,5 +110,26 @@ pub const RPC = struct {
 
         // TODO: decode somehow?
         return result;
+    }
+
+    pub fn deinit(self: *RPC) void {
+        std.debug.print("Deiniting now\n", .{});
+        self.process.deinit();
+        self.alloc.destroy(self.listener);
+    }
+
+    pub fn halt(self: *RPC) !std.ChildProcess.Term {
+        // Manually close stdin, to halt the subprocess on the other side
+        (self.process.stdin orelse unreachable).close();
+        self.process.stdin = null;
+        const term = try self.process.wait();
+        self.thread.wait();
+
+        // Flush out the queue to avoid memory leaks
+        while (self.get_event()) |event| {
+            try self.release_event(event);
+        }
+
+        return term;
     }
 };

@@ -20,12 +20,18 @@ pub fn main() anyerror!void {
         "./vendor/neovim/build/bin/nvim", "--embed",
     };
     var nvim = try rpc.RPC.init(&nvim_cmd, alloc);
+    defer nvim.deinit();
+
     var options = msgpack.KeyValueMap.init(alloc);
     try options.put(
         msgpack.Key{ .RawString = "ext_linegrid" },
         msgpack.Value{ .Boolean = true },
     );
+    defer options.deinit();
+
     const reply = try nvim.call("nvim_ui_attach", .{ 64, 24, options });
+    defer reply.deinit(alloc);
+
     std.debug.print("reply: .{}\n", .{reply});
 
     if (c.glfwInit() != c.GLFW_TRUE) {
@@ -104,4 +110,7 @@ pub fn main() anyerror!void {
 
         c.glfwWaitEvents();
     }
+
+    // Halt the subprocess, then clean out any remaining items in the queue
+    _ = try nvim.halt(); // Ignore return code
 }

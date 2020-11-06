@@ -501,20 +501,6 @@ pub const Window = struct {
             @ptrCast([*c]const u8, &u),
             @sizeOf(c.fpUniforms),
         );
-
-        // TODO: this shouldn'be in resize
-        var txt_buf: [256]u32 = undefined;
-        var i: u32 = 0;
-        while (i < 256) : (i += 1) {
-            txt_buf[i] = @intCast(u32, i);
-        }
-        c.wgpu_queue_write_buffer(
-            self.queue,
-            self.char_grid_buffer,
-            0,
-            @ptrCast([*c]const u8, &txt_buf),
-            txt_buf.len * @sizeOf(u32),
-        );
     }
 };
 

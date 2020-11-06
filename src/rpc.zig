@@ -21,7 +21,6 @@ const Listener = struct {
     fn run(self: *Listener) !void {
         var buf: [1024 * 32]u8 = undefined;
         while (true) {
-            std.debug.print("Reading...\n", .{});
             const in = try self.input.read(&buf);
             if (in == 0) {
                 break;
@@ -92,10 +91,14 @@ pub const RPC = struct {
         const tmp_alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
 
+        // Push the serialized call to the subprocess's stdin
         const p = try msgpack.Value.encode(tmp_alloc, params);
         const v = try msgpack.Value.encode(tmp_alloc, .{ RPC_TYPE_REQUEST, self.msgid, method, p });
         try v.serialize(self.output);
+
+        // Wait for a reply from the worker thread
         const response = self.listener.response_queue.get();
+        defer response.deinit(self.alloc);
 
         // Check that the msgids are correct
         std.debug.assert(response.Array[1].UInt == self.msgid);
@@ -106,14 +109,17 @@ pub const RPC = struct {
         const result = response.Array[3];
         if (err != @TagType(msgpack.Value).Nil) {
             // TODO: handle error here
+            std.debug.panic("Got error in msgpack-rpc call\n", .{});
         }
+
+        // Steal the result from the array, so it's not destroyed
+        response.Array[3] = .Nil;
 
         // TODO: decode somehow?
         return result;
     }
 
     pub fn deinit(self: *RPC) void {
-        std.debug.print("Deiniting now\n", .{});
         self.process.deinit();
         self.alloc.destroy(self.listener);
     }

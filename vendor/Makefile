@@ -15,7 +15,3 @@ shaderc:
 	tar -xvzf ${SHADERC}
 	rm ${SHADERC}
 	mv install shaderc
-
-nvim:
-	git clone --depth 1 --branch v0.4.4 git@github.com:neovim/neovim
-	cd neovim && make && make libnvim

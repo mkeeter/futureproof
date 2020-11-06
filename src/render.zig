@@ -27,7 +27,7 @@ pub const Renderer = struct {
     render_pipeline: c.WGPURenderPipelineId,
     pipeline_layout: c.WGPUPipelineLayoutId,
 
-    pub fn init(alloc: *std.mem.Allocator, window: *c.GLFWwindow) !Self {
+    pub fn init(alloc: *std.mem.Allocator, window: *c.GLFWwindow, font: *ft.Atlas) !Self {
         // We'll use an arena for transient CPU-side resources
         // (e.g. SPIR-V buffers, textures)
         var arena = std.heap.ArenaAllocator.init(alloc);

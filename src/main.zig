@@ -31,7 +31,6 @@ pub fn main() anyerror!void {
 
     const reply = try nvim.call("nvim_ui_attach", .{ 64, 24, options });
     defer reply.deinit(alloc);
-
     std.debug.print("reply: .{}\n", .{reply});
 
     if (c.glfwInit() != c.GLFW_TRUE) {

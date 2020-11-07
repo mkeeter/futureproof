@@ -36,10 +36,11 @@ pub const Tui = struct {
         const tmp_alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
 
-        const width = 640;
-        const height = 480;
+        var width: c_int = 640;
+        var height: c_int = 480;
 
         var window = try Window.init(width, height, "futureproof");
+        c.glfwGetFramebufferSize(window.window, &width, &height);
 
         const font = try ft.build_atlas(
             tmp_alloc,
@@ -67,8 +68,8 @@ pub const Tui = struct {
             .char_grid = undefined,
 
             .u = c.fpUniforms{
-                .width_px = width,
-                .height_px = height,
+                .width_px = @intCast(u32, width),
+                .height_px = @intCast(u32, height),
                 .font = font.u,
             },
         };

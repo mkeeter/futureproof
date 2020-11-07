@@ -2,6 +2,7 @@ const std = @import("std");
 
 const c = @import("c.zig");
 const ft = @import("ft.zig");
+const msgpack = @import("msgpack.zig");
 
 const Renderer = @import("renderer.zig").Renderer;
 const RPC = @import("rpc.zig").RPC;
@@ -76,6 +77,18 @@ pub const Tui = struct {
 
         window.set_size_cb(size_cb, @ptrCast(?*c_void, out));
         out.update_size(width, height);
+
+        var options = msgpack.KeyValueMap.init(alloc);
+        try options.put(
+            msgpack.Key{ .RawString = "ext_linegrid" },
+            msgpack.Value{ .Boolean = true },
+        );
+        defer options.deinit();
+        std.debug.print("{} {}\n", .{ x_tiles, y_tiles });
+        const reply = try rpc.call("nvim_ui_attach", .{ x_tiles, y_tiles, options });
+        defer reply.destroy(alloc);
+        std.debug.print("reply: .{}\n", .{reply});
+
         return out;
     }
 

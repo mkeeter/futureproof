@@ -16,16 +16,5 @@ pub fn main() anyerror!void {
     var tui = try Tui.init(alloc);
     defer tui.deinit();
 
-    // Attach the remote UI (TODO: move this to tui.zig)
-    var options = msgpack.KeyValueMap.init(alloc);
-    try options.put(
-        msgpack.Key{ .RawString = "ext_linegrid" },
-        msgpack.Value{ .Boolean = true },
-    );
-    defer options.deinit();
-    const reply = try tui.rpc.call("nvim_ui_attach", .{ 1, 1, options });
-    defer reply.destroy(alloc);
-    std.debug.print("reply: .{}\n", .{reply});
-
     try tui.run();
 }

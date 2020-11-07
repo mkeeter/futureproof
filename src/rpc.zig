@@ -25,16 +25,18 @@ const Listener = struct {
             if (in == 0) {
                 break;
             }
-            const v = try msgpack.decode(self.alloc, buf[0..in]);
-            if (v.data.Array[0].UInt == RPC_TYPE_RESPONSE) {
-                try self.response_queue.put(v.data);
-            } else if (v.data.Array[0].UInt == RPC_TYPE_NOTIFICATION) {
-                try self.event_queue.put(v.data);
-                c.glfwPostEmptyEvent();
+            var offset: usize = 0;
+            while (offset != in) {
+                const v = try msgpack.decode(self.alloc, buf[offset..in]);
+                if (v.data.Array[0].UInt == RPC_TYPE_RESPONSE) {
+                    try self.response_queue.put(v.data);
+                } else if (v.data.Array[0].UInt == RPC_TYPE_NOTIFICATION) {
+                    try self.event_queue.put(v.data);
+                    c.glfwPostEmptyEvent();
+                }
+                offset += v.offset;
             }
-            // TODO: shift data in the buffer over, in case it contained
-            // another msgpack message
-            std.debug.assert(v.offset == in);
+            std.debug.assert(offset == in);
         }
     }
 };

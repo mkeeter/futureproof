@@ -74,20 +74,19 @@ pub const Tui = struct {
                 .font = font.u,
             },
         };
-
         window.set_size_cb(size_cb, @ptrCast(?*c_void, out));
-        out.update_size(width, height);
 
+        // Attach the UI via RPC
         var options = msgpack.KeyValueMap.init(alloc);
         try options.put(
             msgpack.Key{ .RawString = "ext_linegrid" },
             msgpack.Value{ .Boolean = true },
         );
         defer options.deinit();
-        std.debug.print("{} {}\n", .{ x_tiles, y_tiles });
         const reply = try rpc.call("nvim_ui_attach", .{ x_tiles, y_tiles, options });
         defer reply.destroy(alloc);
-        std.debug.print("reply: .{}\n", .{reply});
+
+        out.update_size(width, height);
 
         return out;
     }
@@ -176,7 +175,12 @@ pub const Tui = struct {
         self.renderer.resize_swap_chain(self.u.width_px, self.u.height_px);
         self.renderer.update_uniforms(&self.u);
 
-        // TODO: tell nvim that we've resized
+        const x_tiles = self.u.width_px / self.u.font.glyph_advance;
+        const y_tiles = self.u.height_px / self.u.font.glyph_height;
+        const reply = self.rpc.call("nvim_ui_try_resize", .{ x_tiles, y_tiles }) catch |err| {
+            std.debug.panic("Failed to resize UI: {}\n", .{err});
+        };
+        defer reply.destroy(self.alloc);
 
         self.tick() catch |err| {
             std.debug.panic("Failed to tick: {}\n", .{err});

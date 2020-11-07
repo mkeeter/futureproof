@@ -74,7 +74,7 @@ pub const Tui = struct {
                 .font = font.u,
             },
         };
-        window.set_size_cb(size_cb, @ptrCast(?*c_void, out));
+        window.set_callbacks(size_cb, key_cb, @ptrCast(?*c_void, out));
 
         // Attach the UI via RPC
         var options = msgpack.KeyValueMap.init(alloc);
@@ -186,10 +186,145 @@ pub const Tui = struct {
             std.debug.panic("Failed to tick: {}\n", .{err});
         };
     }
+
+    fn get_ascii_lower(key: c_int) ?u8 {
+        if (key >= 1 and key <= 127) {
+            const char = @intCast(u8, key);
+            if (char >= 'A' and char <= 'Z') {
+                return char + ('a' - 'A');
+            } else {
+                return char;
+            }
+        }
+        return null;
+    }
+
+    fn get_ascii(key: c_int, mods: c_int) ?u8 {
+        if (get_ascii_lower(key)) |char| {
+            return if ((mods & c.GLFW_MOD_SHIFT) != 0) to_upper(char) else char;
+        }
+        return null;
+    }
+
+    fn to_upper(key: u8) u8 {
+        return switch (key) {
+            'a'...'z' => key - ('a' - 'A'),
+            '`' => '~',
+            '1' => '!',
+            '2' => '@',
+            '3' => '#',
+            '4' => '$',
+            '5' => '%',
+            '6' => '^',
+            '7' => '&',
+            '8' => '*',
+            '9' => '(',
+            '0' => ')',
+            '-' => '_',
+            '=' => '+',
+            '[' => '{',
+            ']' => '}',
+            '\\' => '|',
+            ';' => ':',
+            '\'' => '"',
+            ',' => '<',
+            '.' => '>',
+            '/' => '?',
+            else => key,
+        };
+    }
+
+    fn get_encoded(key: c_int) ?([]const u8) {
+        return switch (key) {
+            c.GLFW_KEY_ENTER => "<Enter>",
+            c.GLFW_KEY_ESCAPE => "<Esc>",
+            c.GLFW_KEY_TAB => "<Tab>",
+            c.GLFW_KEY_BACKSPACE => "<BS>",
+            c.GLFW_KEY_INSERT => "<Insert>",
+            c.GLFW_KEY_DELETE => "<Del>",
+            c.GLFW_KEY_RIGHT => "<Right>",
+            c.GLFW_KEY_LEFT => "<Left>",
+            c.GLFW_KEY_DOWN => "<Down>",
+            c.GLFW_KEY_UP => "<Up>",
+            c.GLFW_KEY_PAGE_UP => "<PageUp>",
+            c.GLFW_KEY_PAGE_DOWN => "<PageDown>",
+            c.GLFW_KEY_HOME => "<Home>",
+            c.GLFW_KEY_END => "<End>",
+
+            c.GLFW_KEY_F1 => "<F1>",
+            c.GLFW_KEY_F2 => "<F2>",
+            c.GLFW_KEY_F3 => "<F3>",
+            c.GLFW_KEY_F4 => "<F4>",
+            c.GLFW_KEY_F5 => "<F5>",
+            c.GLFW_KEY_F6 => "<F6>",
+            c.GLFW_KEY_F7 => "<F7>",
+            c.GLFW_KEY_F8 => "<F8>",
+            c.GLFW_KEY_F9 => "<F9>",
+            c.GLFW_KEY_F10 => "<F10>",
+            c.GLFW_KEY_F11 => "<F11>",
+            c.GLFW_KEY_F12 => "<F12>",
+
+            c.GLFW_KEY_KP_0 => "<k0>",
+            c.GLFW_KEY_KP_1 => "<k1>",
+            c.GLFW_KEY_KP_2 => "<k2>",
+            c.GLFW_KEY_KP_3 => "<k3>",
+            c.GLFW_KEY_KP_4 => "<k4>",
+            c.GLFW_KEY_KP_5 => "<k5>",
+            c.GLFW_KEY_KP_6 => "<k6>",
+            c.GLFW_KEY_KP_7 => "<k7>",
+            c.GLFW_KEY_KP_8 => "<k8>",
+            c.GLFW_KEY_KP_9 => "<k9>",
+            c.GLFW_KEY_KP_DECIMAL => "<kPoint>",
+            c.GLFW_KEY_KP_DIVIDE => "<kDivide>",
+            c.GLFW_KEY_KP_MULTIPLY => "<kMultiply>",
+            c.GLFW_KEY_KP_SUBTRACT => "<kSubtract>",
+            c.GLFW_KEY_KP_ADD => "<kAdd>",
+            c.GLFW_KEY_KP_ENTER => "<kEnter>",
+            c.GLFW_KEY_KP_EQUAL => "<kEqual>",
+
+            else => null,
+        };
+    }
+
+    fn skip_key(key: c_int) bool {
+        return switch (key) {
+            c.GLFW_KEY_LEFT_SHIFT,
+            c.GLFW_KEY_LEFT_CONTROL,
+            c.GLFW_KEY_LEFT_ALT,
+            c.GLFW_KEY_LEFT_SUPER,
+            c.GLFW_KEY_RIGHT_SHIFT,
+            c.GLFW_KEY_RIGHT_CONTROL,
+            c.GLFW_KEY_RIGHT_ALT,
+            c.GLFW_KEY_RIGHT_SUPER,
+            => true,
+            else => false,
+        };
+    }
+
+    pub fn on_key(self: *Self, key: c_int, mods: c_int) void {
+        if (skip_key(key)) {
+            // Nothing to do here
+        } else if (get_ascii(key, mods)) |char| {
+            std.debug.print("{c} {}\n", .{ char, mods });
+        } else if (get_encoded(key)) |enc| {
+            std.debug.print("{s} {}\n", .{ enc, mods });
+        } else {
+            std.debug.print("Got unknown key {} {}\n", .{ key, mods });
+        }
+    }
 };
 
 export fn size_cb(w: ?*c.GLFWwindow, width: c_int, height: c_int) void {
     const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
     var tui = @ptrCast(*Tui, @alignCast(8, ptr));
     tui.update_size(width, height);
+}
+
+export fn key_cb(w: ?*c.GLFWwindow, key: c_int, scancode: c_int, action: c_int, mods: c_int) void {
+    std.debug.print("Got scancode {}\n", .{scancode});
+    const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
+    var tui = @ptrCast(*Tui, @alignCast(8, ptr));
+    if (action == c.GLFW_PRESS or action == c.GLFW_REPEAT) {
+        tui.on_key(key, mods);
+    }
 }

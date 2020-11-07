@@ -24,8 +24,14 @@ pub const Window = struct {
         return c.glfwWindowShouldClose(self.window) != 0;
     }
 
-    pub fn set_size_cb(self: *Self, f: anytype, data: ?*c_void) void {
+    pub fn set_callbacks(
+        self: *Self,
+        size_cb: c.GLFWframebuffersizefun,
+        key_cb: c.GLFWkeyfun,
+        data: ?*c_void,
+    ) void {
         _ = c.glfwSetWindowUserPointer(self.window, data);
-        _ = c.glfwSetFramebufferSizeCallback(self.window, f);
+        _ = c.glfwSetFramebufferSizeCallback(self.window, size_cb);
+        _ = c.glfwSetKeyCallback(self.window, key_cb);
     }
 };

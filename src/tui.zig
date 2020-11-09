@@ -207,6 +207,7 @@ pub const Tui = struct {
     }
 
     fn to_upper(key: u8) u8 {
+        // This assumes a US-EN keyboard
         return switch (key) {
             'a'...'z' => key - ('a' - 'A'),
             '`' => '~',
@@ -302,9 +303,24 @@ pub const Tui = struct {
     }
 
     pub fn on_key(self: *Self, key: c_int, mods: c_int) void {
+        var arena = std.heap.ArenaAllocator.init(self.alloc);
+        var alloc: *std.mem.Allocator = &arena.allocator;
+        defer arena.deinit();
+
         if (skip_key(key)) {
             // Nothing to do here
         } else if (get_ascii(key, mods)) |char| {
+            if ((mods & (~@intCast(c_int, c.GLFW_MOD_SHIFT))) == 0) {
+                const str = [1]u8{char};
+                const bin = msgpack.Value{ .RawData = &str };
+                var bin_arr = [1]msgpack.Value{bin};
+                const arr = msgpack.Value{ .Array = &bin_arr };
+                const reply = self.rpc.call("nvim_input", arr) catch |err| {
+                    std.debug.panic("Failed to call nvim_input: {}", .{err});
+                };
+                std.debug.print("Got reply {}\n", .{reply});
+                defer reply.destroy(self.rpc.alloc);
+            }
             std.debug.print("{c} {}\n", .{ char, mods });
         } else if (get_encoded(key)) |enc| {
             std.debug.print("{s} {}\n", .{ enc, mods });
@@ -321,7 +337,6 @@ export fn size_cb(w: ?*c.GLFWwindow, width: c_int, height: c_int) void {
 }
 
 export fn key_cb(w: ?*c.GLFWwindow, key: c_int, scancode: c_int, action: c_int, mods: c_int) void {
-    std.debug.print("Got scancode {}\n", .{scancode});
     const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
     var tui = @ptrCast(*Tui, @alignCast(8, ptr));
     if (action == c.GLFW_PRESS or action == c.GLFW_REPEAT) {

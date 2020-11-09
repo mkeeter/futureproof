@@ -95,6 +95,7 @@ pub const RPC = struct {
 
         // Push the serialized call to the subprocess's stdin
         const p = try msgpack.Value.encode(tmp_alloc, params);
+        std.debug.print("Encoded {}\n", .{p});
         const v = try msgpack.Value.encode(tmp_alloc, .{ RPC_TYPE_REQUEST, self.msgid, method, p });
         try v.serialize(self.output);
 
@@ -111,7 +112,7 @@ pub const RPC = struct {
         const result = response.Array[3];
         if (err != @TagType(msgpack.Value).Nil) {
             // TODO: handle error here
-            std.debug.panic("Got error in msgpack-rpc call\n", .{});
+            std.debug.panic("Got error in msgpack-rpc call: {}\n", .{err.Array[1]});
         }
 
         // Steal the result from the array, so it's not destroyed

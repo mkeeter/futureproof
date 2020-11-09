@@ -307,32 +307,36 @@ pub const Tui = struct {
         var alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
 
+        var char_str = [1]u8{0};
+        var str: ?[]const u8 = null;
+
         if (skip_key(key)) {
             // Nothing to do here
         } else if (get_ascii(key, mods)) |char| {
             if ((mods & (~@intCast(c_int, c.GLFW_MOD_SHIFT))) == 0) {
-                const str = [1]u8{char};
-                const bin = msgpack.Value{ .RawString = &str };
-                var bin_arr = [1]msgpack.Value{bin};
-                const arr = msgpack.Value{ .Array = &bin_arr };
-                const reply = self.rpc.call("nvim_input", arr) catch |err| {
-                    std.debug.panic("Failed to call nvim_input: {}", .{err});
-                };
-                defer reply.destroy(self.rpc.alloc);
+                char_str[0] = char;
+                str = &char_str;
+            } else {
+                std.debug.print("Cannot handle mods yet", .{});
             }
-            std.debug.print("{c} {}\n", .{ char, mods });
         } else if (get_encoded(key)) |enc| {
             if (mods == 0) {
-                const bin = msgpack.Value{ .RawString = enc };
-                var bin_arr = [1]msgpack.Value{bin};
-                const arr = msgpack.Value{ .Array = &bin_arr };
-                const reply = self.rpc.call("nvim_input", arr) catch |err| {
-                    std.debug.panic("Failed to call nvim_input: {}", .{err});
-                };
-                defer reply.destroy(self.rpc.alloc);
+                str = enc;
+            } else {
+                std.debug.print("Cannot handle mods yet", .{});
             }
         } else {
             std.debug.print("Got unknown key {} {}\n", .{ key, mods });
+        }
+
+        if (str) |s| {
+            const bin = msgpack.Value{ .RawString = s };
+            var bin_arr = [1]msgpack.Value{bin};
+            const arr = msgpack.Value{ .Array = &bin_arr };
+            const reply = self.rpc.call("nvim_input", arr) catch |err| {
+                std.debug.panic("Failed to call nvim_input: {}", .{err});
+            };
+            defer reply.destroy(self.rpc.alloc);
         }
     }
 };

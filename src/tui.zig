@@ -312,18 +312,25 @@ pub const Tui = struct {
         } else if (get_ascii(key, mods)) |char| {
             if ((mods & (~@intCast(c_int, c.GLFW_MOD_SHIFT))) == 0) {
                 const str = [1]u8{char};
-                const bin = msgpack.Value{ .RawData = &str };
+                const bin = msgpack.Value{ .RawString = &str };
                 var bin_arr = [1]msgpack.Value{bin};
                 const arr = msgpack.Value{ .Array = &bin_arr };
                 const reply = self.rpc.call("nvim_input", arr) catch |err| {
                     std.debug.panic("Failed to call nvim_input: {}", .{err});
                 };
-                std.debug.print("Got reply {}\n", .{reply});
                 defer reply.destroy(self.rpc.alloc);
             }
             std.debug.print("{c} {}\n", .{ char, mods });
         } else if (get_encoded(key)) |enc| {
-            std.debug.print("{s} {}\n", .{ enc, mods });
+            if (mods == 0) {
+                const bin = msgpack.Value{ .RawString = enc };
+                var bin_arr = [1]msgpack.Value{bin};
+                const arr = msgpack.Value{ .Array = &bin_arr };
+                const reply = self.rpc.call("nvim_input", arr) catch |err| {
+                    std.debug.panic("Failed to call nvim_input: {}", .{err});
+                };
+                defer reply.destroy(self.rpc.alloc);
+            }
         } else {
             std.debug.print("Got unknown key {} {}\n", .{ key, mods });
         }

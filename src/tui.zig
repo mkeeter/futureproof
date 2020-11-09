@@ -313,7 +313,9 @@ pub const Tui = struct {
         if (skip_key(key)) {
             // Nothing to do here
         } else if (get_ascii(key, mods)) |char| {
-            if ((mods & (~@intCast(c_int, c.GLFW_MOD_SHIFT))) == 0) {
+            if (char == '<') {
+                str = "<LT>";
+            } else if ((mods & (~@intCast(c_int, c.GLFW_MOD_SHIFT))) == 0) {
                 char_str[0] = char;
                 str = &char_str;
             } else {

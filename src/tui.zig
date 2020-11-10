@@ -22,6 +22,9 @@ pub const Tui = struct {
     rpc: RPC,
 
     char_grid: [512 * 512]u32,
+    x_tiles: u32,
+    y_tiles: u32,
+    total_tiles: u32,
 
     //  Render state to pass into WGPU
     u: c.fpUniforms,
@@ -67,6 +70,9 @@ pub const Tui = struct {
             .rpc = rpc,
 
             .char_grid = undefined,
+            .x_tiles = undefined,
+            .y_tiles = undefined,
+            .total_tiles = undefined,
 
             .u = c.fpUniforms{
                 .width_px = @intCast(u32, width),
@@ -91,61 +97,70 @@ pub const Tui = struct {
         return out;
     }
 
+    fn grid_line(self: *Self, line: []const msgpack.Value) void {
+        const grid = line[0].UInt;
+        std.debug.assert(grid == 1);
+
+        const row = line[1].UInt;
+        var col = line[2].UInt;
+        for (line[3].Array) |cell_| {
+            const cell = cell_.Array;
+            const text = cell[0].RawString;
+            const repeat = if (cell.len >= 3) cell[2].UInt else 1;
+            std.debug.assert(text.len == 1);
+            var i: usize = 0;
+            while (i < repeat) : (i += 1) {
+                self.char_at(col, row).* = text[0];
+                col += 1; // TODO: unicode?!
+            }
+        }
+    }
+
+    fn char_at(self: *Self, x: usize, y: usize) *u32 {
+        return &self.char_grid[x + y * self.x_tiles];
+    }
+
+    fn grid_scroll(self: *Self, line: []const msgpack.Value) void {
+        const grid = line[0].UInt;
+        std.debug.assert(grid == 1);
+
+        // Welcome to the obnoxious math zone
+        const top = @intCast(i32, line[1].UInt);
+        const bot = @intCast(i32, line[2].UInt);
+        const left = line[3].UInt;
+        const right = line[4].UInt;
+        const rows = @intCast(i32, line[5].UInt);
+        const cols = line[6].UInt;
+        std.debug.assert(cols == 0);
+
+        var y: i32 = if (rows > 0) (bot - rows) else (top + rows - 1);
+        var dy: i32 = if (rows > 0) 1 else -1;
+        var y_final: i32 = if (rows > 0) bot else (top - 1);
+        while (y != y_final) : (y += dy) {
+            var x = left;
+            const y_src = @intCast(u32, y);
+            const y_dst = @intCast(u32, y - rows);
+            while (x < right) : (x += 1) {
+                self.char_at(x, y_dst).* = self.char_at(x, y_src).*;
+            }
+        }
+    }
+
     pub fn tick(self: *Self) !void {
         const x_tiles = self.u.width_px / self.u.font.glyph_advance;
-        const y_tiles = self.u.height_px / self.u.font.glyph_height;
-        const total_tiles = x_tiles * y_tiles;
 
         while (self.rpc.get_event()) |event| {
             for (event.Array[2].Array) |cmd| {
                 if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_line")) {
                     for (cmd.Array[1..]) |v| {
-                        const line = v.Array;
-                        const grid = line[0].UInt;
-                        const row = line[1].UInt;
-                        var col = line[2].UInt;
-                        std.debug.print("Printing at {} {}\n    '", .{ row, col });
-                        for (line[3].Array) |cell_| {
-                            const cell = cell_.Array;
-                            const text = cell[0].RawString;
-                            const repeat = if (cell.len >= 3) cell[2].UInt else 1;
-                            std.debug.print("{} {}\t", .{ text, repeat });
-                            std.debug.assert(text.len == 1);
-                            var i: usize = 0;
-                            while (i < repeat) : (i += 1) {
-                                self.char_grid[col + row * x_tiles] = text[0];
-                                col += 1; // TODO: unicode?!
-                            }
-                        }
-                        std.debug.print("'\n", .{});
+                        self.grid_line(v.Array);
                     }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_scroll")) {
                     for (cmd.Array[1..]) |v| {
-                        const line = v.Array;
-                        const grid = line[0].UInt;
-                        const top = @intCast(i32, line[1].UInt);
-                        const bot = @intCast(i32, line[2].UInt);
-                        const left = line[3].UInt;
-                        const right = line[4].UInt;
-                        const rows = @intCast(i32, line[5].UInt);
-                        const cols = line[6].UInt;
-                        std.debug.assert(cols == 0);
-
-                        var y: i32 = if (rows > 0) (bot - rows) else (top + rows - 1);
-                        var dy: i32 = if (rows > 0) 1 else -1;
-                        var y_final: i32 = if (rows > 0) bot else (top - 1);
-                        while (y != y_final) : (y += dy) {
-                            var x = left;
-                            const y_src = @intCast(u32, y);
-                            const y_dst = @intCast(u32, y - rows);
-                            while (x < right) : (x += 1) {
-                                const char = self.char_grid[x + y_src * x_tiles];
-                                self.char_grid[x + y_dst * x_tiles] = char;
-                            }
-                        }
+                        self.grid_scroll(v.Array);
                     }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "flush")) {
-                    self.renderer.update_grid(self.char_grid[0..total_tiles]);
+                    self.renderer.update_grid(self.char_grid[0..self.total_tiles]);
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_clear")) {
                     std.mem.set(u32, self.char_grid[0..], 0);
                 } else {
@@ -155,7 +170,7 @@ pub const Tui = struct {
             try self.rpc.release_event(event);
         }
 
-        self.renderer.redraw(total_tiles);
+        self.renderer.redraw(self.total_tiles);
     }
 
     pub fn run(self: *Self) !void {
@@ -171,6 +186,10 @@ pub const Tui = struct {
     pub fn update_size(self: *Self, width: c_int, height: c_int) void {
         self.u.width_px = @intCast(u32, width);
         self.u.height_px = @intCast(u32, height);
+
+        self.x_tiles = self.u.width_px / self.u.font.glyph_advance;
+        self.y_tiles = self.u.height_px / self.u.font.glyph_height;
+        self.total_tiles = self.x_tiles * self.y_tiles;
 
         self.renderer.resize_swap_chain(self.u.width_px, self.u.height_px);
         self.renderer.update_uniforms(&self.u);

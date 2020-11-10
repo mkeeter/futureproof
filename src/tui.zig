@@ -368,13 +368,13 @@ pub const Tui = struct {
                 char_str[0] = char;
                 str = &char_str;
             } else {
-                std.debug.print("Cannot handle mods yet", .{});
+                std.debug.print("Cannot handle mods yet\n", .{});
             }
         } else if (get_encoded(key)) |enc| {
             if (mods == 0) {
                 str = enc;
             } else {
-                std.debug.print("Cannot handle mods yet", .{});
+                std.debug.print("Cannot handle mods yet\n", .{});
             }
         } else {
             std.debug.print("Got unknown key {} {}\n", .{ key, mods });

@@ -167,8 +167,12 @@ pub const Tui = struct {
         std.debug.print("Moved cursor to {} {}\n", .{ self.cursor_x, self.cursor_y });
     }
 
-    pub fn tick(self: *Self) !void {
+    pub fn tick(self: *Self) !bool {
         while (self.rpc.get_event()) |event| {
+            if (event == .Int) {
+                return false;
+            }
+
             for (event.Array[2].Array) |cmd| {
                 if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_line")) {
                     for (cmd.Array[1..]) |v| {
@@ -194,11 +198,11 @@ pub const Tui = struct {
         }
 
         self.renderer.redraw(self.total_tiles);
+        return true;
     }
 
     pub fn run(self: *Self) !void {
-        while (!self.window.should_close()) {
-            try self.tick();
+        while (!self.window.should_close() and (try self.tick())) {
             c.glfwWaitEvents();
         }
 
@@ -224,7 +228,7 @@ pub const Tui = struct {
         };
         defer reply.destroy(self.alloc);
 
-        self.tick() catch |err| {
+        _ = self.tick() catch |err| {
             std.debug.panic("Failed to tick: {}\n", .{err});
         };
     }

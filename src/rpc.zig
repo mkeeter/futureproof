@@ -38,6 +38,8 @@ const Listener = struct {
             }
             std.debug.assert(offset == in);
         }
+        try self.event_queue.put(msgpack.Value{ .Int = -1 });
+        c.glfwPostEmptyEvent();
     }
 };
 

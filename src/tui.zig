@@ -97,30 +97,11 @@ pub const Tui = struct {
         return out;
     }
 
-    fn grid_line(self: *Self, line: []const msgpack.Value) void {
-        const grid = line[0].UInt;
-        std.debug.assert(grid == 1);
-
-        const row = line[1].UInt;
-        var col = line[2].UInt;
-        for (line[3].Array) |cell_| {
-            const cell = cell_.Array;
-            const text = cell[0].RawString;
-            const repeat = if (cell.len >= 3) cell[2].UInt else 1;
-            std.debug.assert(text.len == 1);
-            var i: usize = 0;
-            while (i < repeat) : (i += 1) {
-                self.char_at(col, row).* = text[0];
-                col += 1; // TODO: unicode?!
-            }
-        }
-    }
-
     fn char_at(self: *Self, x: usize, y: usize) *u32 {
         return &self.char_grid[x + y * self.x_tiles];
     }
 
-    fn grid_scroll(self: *Self, line: []const msgpack.Value) void {
+    fn api_grid_scroll(self: *Self, line: []const msgpack.Value) void {
         const grid = line[0].UInt;
         std.debug.assert(grid == 1);
 
@@ -146,6 +127,33 @@ pub const Tui = struct {
         }
     }
 
+    fn api_grid_line(self: *Self, line: []const msgpack.Value) void {
+        const grid = line[0].UInt;
+        std.debug.assert(grid == 1);
+
+        const row = line[1].UInt;
+        var col = line[2].UInt;
+        for (line[3].Array) |cell_| {
+            const cell = cell_.Array;
+            const text = cell[0].RawString;
+            const repeat = if (cell.len >= 3) cell[2].UInt else 1;
+            std.debug.assert(text.len == 1);
+            var i: usize = 0;
+            while (i < repeat) : (i += 1) {
+                self.char_at(col, row).* = text[0];
+                col += 1; // TODO: unicode?!
+            }
+        }
+    }
+
+    fn api_flush(self: *Self) void {
+        self.renderer.update_grid(self.char_grid[0..self.total_tiles]);
+    }
+
+    fn api_grid_clear(self: *Self) void {
+        std.mem.set(u32, self.char_grid[0..], 0);
+    }
+
     pub fn tick(self: *Self) !void {
         const x_tiles = self.u.width_px / self.u.font.glyph_advance;
 
@@ -153,16 +161,16 @@ pub const Tui = struct {
             for (event.Array[2].Array) |cmd| {
                 if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_line")) {
                     for (cmd.Array[1..]) |v| {
-                        self.grid_line(v.Array);
+                        self.api_grid_line(v.Array);
                     }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_scroll")) {
                     for (cmd.Array[1..]) |v| {
-                        self.grid_scroll(v.Array);
+                        self.api_grid_scroll(v.Array);
                     }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "flush")) {
-                    self.renderer.update_grid(self.char_grid[0..self.total_tiles]);
+                    self.api_flush();
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_clear")) {
-                    std.mem.set(u32, self.char_grid[0..], 0);
+                    self.api_grid_clear();
                 } else {
                     std.debug.print("Unimplemented: {}\n", .{cmd.Array[0]});
                 }

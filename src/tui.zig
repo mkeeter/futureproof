@@ -228,9 +228,12 @@ pub const Tui = struct {
         };
         defer reply.destroy(self.alloc);
 
-        _ = self.tick() catch |err| {
+        const r = self.tick() catch |err| {
             std.debug.panic("Failed to tick: {}\n", .{err});
         };
+
+        // Resizing the window shouldn't ever cause the nvim process to exit
+        std.debug.assert(r);
     }
 
     fn get_ascii_lower(key: c_int) ?u8 {

@@ -155,8 +155,6 @@ pub const Tui = struct {
     }
 
     pub fn tick(self: *Self) !void {
-        const x_tiles = self.u.width_px / self.u.font.glyph_advance;
-
         while (self.rpc.get_event()) |event| {
             for (event.Array[2].Array) |cmd| {
                 if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_line")) {

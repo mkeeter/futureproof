@@ -25,6 +25,8 @@ pub const Tui = struct {
     x_tiles: u32,
     y_tiles: u32,
     total_tiles: u32,
+    cursor_x: u32,
+    cursor_y: u32,
 
     //  Render state to pass into WGPU
     u: c.fpUniforms,
@@ -73,6 +75,8 @@ pub const Tui = struct {
             .x_tiles = undefined,
             .y_tiles = undefined,
             .total_tiles = undefined,
+            .cursor_x = 0,
+            .cursor_y = 0,
 
             .u = c.fpUniforms{
                 .width_px = @intCast(u32, width),
@@ -154,6 +158,15 @@ pub const Tui = struct {
         std.mem.set(u32, self.char_grid[0..], 0);
     }
 
+    fn api_grid_cursor_goto(self: *Self, cmd: []const msgpack.Value) void {
+        const grid = cmd[0].UInt;
+        std.debug.assert(grid == 1);
+
+        self.cursor_x = @intCast(u32, cmd[1].UInt);
+        self.cursor_y = @intCast(u32, cmd[2].UInt);
+        std.debug.print("Moved cursor to {} {}\n", .{ self.cursor_x, self.cursor_y });
+    }
+
     pub fn tick(self: *Self) !void {
         while (self.rpc.get_event()) |event| {
             for (event.Array[2].Array) |cmd| {
@@ -169,6 +182,10 @@ pub const Tui = struct {
                     self.api_flush();
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_clear")) {
                     self.api_grid_clear();
+                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_cursor_goto")) {
+                    for (cmd.Array[1..]) |v| {
+                        self.api_grid_cursor_goto(v.Array);
+                    }
                 } else {
                     std.debug.print("Unimplemented: {}\n", .{cmd.Array[0]});
                 }

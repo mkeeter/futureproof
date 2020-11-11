@@ -76,7 +76,7 @@ pub const Renderer = struct {
 
         ////////////////////////////////////////////////////////////////////////////
         // Build the shaders using shaderc
-        const vert_spv = shaderc.build_shader_from_file(tmp_alloc, "data/triangle.vert") catch |err| {
+        const vert_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/grid.vert") catch |err| {
             std.debug.panic("Could not open file", .{});
         };
         const vert_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
@@ -84,7 +84,7 @@ pub const Renderer = struct {
             .length = vert_spv.len,
         });
 
-        const frag_spv = shaderc.build_shader_from_file(tmp_alloc, "data/triangle.frag") catch |err| {
+        const frag_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/grid.frag") catch |err| {
             std.debug.panic("Could not open file", .{});
         };
         const frag_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){

@@ -5,6 +5,7 @@
 
 layout(location=0) in  vec2 v_tex_coords;
 layout(location=1) in flat uint v_ascii;
+layout(location=2) in flat uint v_cursor;
 
 layout(location=0) out vec4 out_color;
 
@@ -21,5 +22,9 @@ void main() {
                          ivec2(glyph.x0 + v_tex_coords.x * glyph.width,
                                glyph.y0 + (1 - v_tex_coords.y) * glyph.height),
                          0).r;
-    out_color = vec4(t, t, t, 1.0);
+    if (v_cursor == 0) {
+        out_color = vec4(t, t, t, 1.0);
+    } else {
+        out_color = vec4(1.0, 1.0, 1.0, 1.0);
+    }
 }

@@ -12,6 +12,7 @@ layout(set=0, binding=3) buffer CharGrid {
 
 layout(location=0) out vec2 v_tex_coords;
 layout(location=1) out flat uint v_ascii;
+layout(location=2) out flat uint v_cursor;
 
 // Hard-coded triangle layout
 const vec2 positions[6] = vec2[6](
@@ -27,12 +28,16 @@ void main() {
     uint tile_id = gl_VertexIndex / 6;
     const uint x_tiles = u.width_px / u.font.glyph_advance;
     const uint y_tiles = u.height_px / u.font.glyph_height;
-
-    // Tile position (0 to x_tiles, 0 to y_tiles)
-    ivec2 tile = ivec2(tile_id % x_tiles, y_tiles - 1 - (tile_id / x_tiles));
+    const uint total_tiles = x_tiles * y_tiles;
 
     v_ascii = char_grid[tile_id];
     fpGlyph glyph = u.font.glyphs[v_ascii];
+
+    v_cursor = (tile_id % x_tiles == char_grid[total_tiles] &&
+                tile_id / x_tiles == char_grid[total_tiles + 1]) ? 1 : 0;
+
+    // Tile position (0 to x_tiles, 0 to y_tiles)
+    ivec2 tile = ivec2(tile_id % x_tiles, y_tiles - 1 - (tile_id / x_tiles));
 
     // Pixel position (0 to width_px, 0 to height_px)
     ivec2 p = tile * ivec2(u.font.glyph_advance, u.font.glyph_height) +

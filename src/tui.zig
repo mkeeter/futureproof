@@ -161,8 +161,8 @@ pub const Tui = struct {
         std.debug.assert(grid == 1);
 
         // Record the cursor position at the end of the grid
-        self.char_grid[self.total_tiles] = @intCast(u32, cmd[1].UInt);
-        self.char_grid[self.total_tiles + 1] = @intCast(u32, cmd[2].UInt);
+        self.char_grid[self.total_tiles] = @intCast(u32, cmd[2].UInt);
+        self.char_grid[self.total_tiles + 1] = @intCast(u32, cmd[1].UInt);
     }
 
     pub fn tick(self: *Self) !bool {

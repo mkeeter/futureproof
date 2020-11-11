@@ -25,8 +25,6 @@ pub const Tui = struct {
     x_tiles: u32,
     y_tiles: u32,
     total_tiles: u32,
-    cursor_x: u32,
-    cursor_y: u32,
 
     //  Render state to pass into WGPU
     u: c.fpUniforms,
@@ -72,11 +70,9 @@ pub const Tui = struct {
             .rpc = rpc,
 
             .char_grid = undefined,
-            .x_tiles = undefined,
-            .y_tiles = undefined,
-            .total_tiles = undefined,
-            .cursor_x = 0,
-            .cursor_y = 0,
+            .x_tiles = 0,
+            .y_tiles = 0,
+            .total_tiles = 0,
 
             .u = c.fpUniforms{
                 .width_px = @intCast(u32, width),
@@ -151,7 +147,9 @@ pub const Tui = struct {
     }
 
     fn api_flush(self: *Self) void {
-        self.renderer.update_grid(self.char_grid[0..self.total_tiles]);
+        // Send over the character grid, along with the extra two values
+        // that mark cursor position within the grid
+        self.renderer.update_grid(self.char_grid[0 .. self.total_tiles + 2]);
     }
 
     fn api_grid_clear(self: *Self) void {
@@ -162,9 +160,9 @@ pub const Tui = struct {
         const grid = cmd[0].UInt;
         std.debug.assert(grid == 1);
 
-        self.cursor_x = @intCast(u32, cmd[1].UInt);
-        self.cursor_y = @intCast(u32, cmd[2].UInt);
-        std.debug.print("Moved cursor to {} {}\n", .{ self.cursor_x, self.cursor_y });
+        // Record the cursor position at the end of the grid
+        self.char_grid[self.total_tiles] = @intCast(u32, cmd[1].UInt);
+        self.char_grid[self.total_tiles + 1] = @intCast(u32, cmd[2].UInt);
     }
 
     pub fn tick(self: *Self) !bool {
@@ -214,6 +212,9 @@ pub const Tui = struct {
         self.u.width_px = @intCast(u32, width);
         self.u.height_px = @intCast(u32, height);
 
+        const cursor_x = self.char_grid[self.total_tiles];
+        const cursor_y = self.char_grid[self.total_tiles + 1];
+
         self.x_tiles = self.u.width_px / self.u.font.glyph_advance;
         self.y_tiles = self.u.height_px / self.u.font.glyph_height;
         self.total_tiles = self.x_tiles * self.y_tiles;
@@ -227,6 +228,9 @@ pub const Tui = struct {
             std.debug.panic("Failed to resize UI: {}\n", .{err});
         };
         defer reply.destroy(self.alloc);
+
+        self.char_grid[self.total_tiles] = cursor_x;
+        self.char_grid[self.total_tiles + 1] = cursor_y;
 
         const r = self.tick() catch |err| {
             std.debug.panic("Failed to tick: {}\n", .{err});

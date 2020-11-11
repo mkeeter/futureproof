@@ -97,7 +97,6 @@ pub const RPC = struct {
 
         // Push the serialized call to the subprocess's stdin
         const p = try msgpack.Value.encode(tmp_alloc, params);
-        std.debug.print("Encoded {}\n", .{p});
         const v = try msgpack.Value.encode(tmp_alloc, .{ RPC_TYPE_REQUEST, self.msgid, method, p });
         try v.serialize(self.output);
 

@@ -20,7 +20,7 @@ void main() {
         out_color = vec4(1.0, 1.0, 1.0, 1.0);
     } else if (v_ascii == 32 || v_ascii == 0) { // SPACE or NULL
         out_color = vec4(0.0, 0.0, 0.0, 1.0);
-    } else if (v_tex_coords.x >= 0 && v_tex_coords.x <= 1 ||
+    } else if (v_tex_coords.x >= 0 && v_tex_coords.x <= 1 &&
                v_tex_coords.y >= 0 && v_tex_coords.y <= 1)
     {
         fpGlyph glyph = u.font.glyphs[v_ascii];

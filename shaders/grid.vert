@@ -71,7 +71,7 @@ void main() {
     float t1x = -dx / (x1 - x2);
 
     float dy = glyph.height;
-    float y1 = glyph.y_offset - glyph.height + u.font.glyph_z_offset;
+    float y1 = glyph.y_offset;
     float y2 = y1 + glyph.height;
     float t0y = y1 / (y1 - y2);
     float t1y = -dy / (y1 - y2);

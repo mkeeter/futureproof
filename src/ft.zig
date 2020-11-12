@@ -34,7 +34,7 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
     out.u.glyph_height = font_size;
 
     var i: u8 = 0;
-    var max_z_offset: u32 = 0;
+    var baseline: i32 = 0;
     while (i < 128) : (i += 1) {
         try status_to_err(c.FT_Load_Char(face, i, c.FT_LOAD_RENDER | c.FT_LOAD_TARGET_LIGHT));
         const bmp = &(face.*.glyph.*.bitmap);
@@ -74,19 +74,26 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
             .width = bmp.*.width,
             .height = bmp.*.rows,
             .x_offset = face.*.glyph.*.bitmap_left,
-            .y_offset = face.*.glyph.*.bitmap_top,
+            .y_offset = face.*.glyph.*.bitmap_top - @intCast(i32, bmp.*.rows),
         };
 
-        // Track the maximum offset from baseline
-        const h = @intCast(i32, glyph.height) - glyph.y_offset;
-        if (h > max_z_offset) {
-            max_z_offset = @intCast(u32, h);
+        // Track the lowest glyph baseilne
+        if (glyph.y_offset < baseline) {
+            baseline = glyph.y_offset;
         }
 
         out.u.glyphs[i] = glyph;
         x += bmp.*.width;
     }
-    out.u.glyph_z_offset = max_z_offset;
+
+    i = 0;
+    while (i < out.u.glyphs.len) : (i += 1) {
+        out.u.glyphs[i].y_offset -= baseline;
+    }
+
+    std.debug.print("Font uniforms: {}\n", .{out.u});
+    std.debug.print("baseline: {}\n", .{baseline});
+    std.debug.print("'[': {}\n", .{out.u.glyphs['[']});
 
     return out;
 }

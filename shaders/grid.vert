@@ -53,24 +53,24 @@ void main() {
      *  this looks like this:
      *
      *  t0---0--------1-----t1 [texture coordinate]
-     *  x0---x1-------x2----x3 [position]
+     *   0---x1-------x2----dx [position]
      *
      *  Solve for t0 and t1 in terms of x0...3
      *
-     *  t0 + (t1 - t0) * (x1 - x0) / (x3 - x0) = 0
-     *  t0 + (t1 - t0) * (x2 - x0) / (x3 - x0) = 1
+     *  t0 + (t1 - t0) * (x1 - x0) / dx = 0
+     *  t0 + (t1 - t0) * (x2 - x0) / dx = 1
      *
-     *  We can simplify with dt = (t1 - t0), dx = (x3 - x0), x0 = 0
+     *  We can simplify with dt = (t1 - t0)
      *  This leads to t0 = x1/(x1 - x2)
      *                dt = -dx/(x1 - x2)
      */
-    float dx = glyph.width;
+    float dx = u.font.glyph_advance;
     float x1 = glyph.x_offset;
     float x2 = x1 + glyph.width;
     float t0x = x1 / (x1 - x2);
     float t1x = -dx / (x1 - x2);
 
-    float dy = glyph.height;
+    float dy = u.font.glyph_height;
     float y1 = glyph.y_offset;
     float y2 = y1 + glyph.height;
     float t0y = y1 / (y1 - y2);

@@ -26,7 +26,7 @@ void main() {
                v_tex_coords.y > 0 && v_tex_coords.y <= glyph.height)
     {
         ivec2 i = ivec2(glyph.x0 + v_tex_coords.x,
-                        glyph.y0 + glyph.height - 1 - v_tex_coords.y);
+                        glyph.y0 + glyph.height - v_tex_coords.y);
         float t = texelFetch(sampler2D(font_tex, font_sampler), i, 0).r;
         out_color = vec4(t, t, t, 1.0);
     } else {

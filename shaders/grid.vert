@@ -31,6 +31,9 @@ void main() {
     const uint total_tiles = x_tiles * y_tiles;
 
     v_ascii = char_grid[tile_id];
+    if (v_ascii > 127) {
+        v_ascii = 0x3F; // '?'
+    }
     fpGlyph glyph = u.font.glyphs[v_ascii];
 
     v_cursor = (tile_id % x_tiles == char_grid[total_tiles] &&

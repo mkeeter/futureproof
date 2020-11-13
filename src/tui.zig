@@ -127,6 +127,29 @@ pub const Tui = struct {
         }
     }
 
+    fn decode_utf8(char: []const u8) u32 {
+        if (char[0] >> 7 == 0) {
+            std.debug.assert(char.len == 1);
+            return char[0];
+        } else if (char[0] >> 5 == 0b110) {
+            std.debug.assert(char.len == 2);
+            return (@intCast(u32, char[0] & 0b00011111) << 6) |
+                @intCast(u32, char[1] & 0b00111111);
+        } else if (char[0] >> 4 == 0b1110) {
+            std.debug.assert(char.len == 3);
+            return (@intCast(u32, char[0] & 0b00001111) << 12) |
+                (@intCast(u32, char[1] & 0b00111111) << 6) |
+                @intCast(u32, char[2] & 0b00111111);
+        } else if (char[0] >> 3 == 0b11110) {
+            std.debug.assert(char.len == 4);
+            return (@intCast(u32, char[0] & 0b00000111) << 18) |
+                (@intCast(u32, char[1] & 0b00111111) << 12) |
+                (@intCast(u32, char[2] & 0b00111111) << 6) |
+                @intCast(u32, char[3] & 0b00111111);
+        }
+        return 0;
+    }
+
     fn api_grid_line(self: *Self, line: []const msgpack.Value) void {
         const grid = line[0].UInt;
         std.debug.assert(grid == 1);
@@ -137,10 +160,10 @@ pub const Tui = struct {
             const cell = cell_.Array;
             const text = cell[0].RawString;
             const repeat = if (cell.len >= 3) cell[2].UInt else 1;
-            std.debug.assert(text.len == 1);
+            const char = decode_utf8(text);
             var i: usize = 0;
             while (i < repeat) : (i += 1) {
-                self.char_at(col, row).* = text[0];
+                self.char_at(col, row).* = char;
                 col += 1; // TODO: unicode?!
             }
         }

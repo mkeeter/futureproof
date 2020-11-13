@@ -211,6 +211,8 @@ pub const Tui = struct {
                     for (cmd.Array[1..]) |v| {
                         self.api_grid_cursor_goto(v.Array);
                     }
+                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "mouse_on")) {
+                    // Ignored, because UIs are allowed to always send mouse input
                 } else {
                     std.debug.print("Unimplemented: {}\n", .{cmd.Array[0]});
                 }

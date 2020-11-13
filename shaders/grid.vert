@@ -52,29 +52,33 @@ void main() {
      *  the grid are 0 at the character subregion's corners.  In 1D,
      *  this looks like this:
      *
-     *  t0---0--------1-----t1 [texture coordinate]
-     *   0---x1-------x2----dx [position]
+     *  t0---0--------v-----t0 + dt [texture coordinate]
+     *   0---x1-------x2----dx      [pixel position]
      *
-     *  Solve for t0 and t1 in terms of x0...3
+     *  Solve for t0 and dt in terms of x1, d2, dx, v
      *
-     *  t0 + (t1 - t0) * (x1 - x0) / dx = 0
-     *  t0 + (t1 - t0) * (x2 - x0) / dx = 1
+     *  t0 + dt * x1 / dx = 0
+     *  t0 + dt * x2 / dx = v
      *
-     *  We can simplify with dt = (t1 - t0)
-     *  This leads to t0 = x1/(x1 - x2)
-     *                dt = -dx/(x1 - x2)
+     *  dt / dx * (x1 - x2) = -v
+     *      -> dt = v*dx / (x2 - x1)
+     *      -> t0 = v*x1 / (x1 - x2)
      */
     float dx = u.font.glyph_advance;
     float x1 = glyph.x_offset;
     float x2 = x1 + glyph.width;
-    float t0x = x1 / (x1 - x2);
-    float t1x = -dx / (x1 - x2);
+    float vx = glyph.width;
+    float t0x = vx * x1 / (x1 - x2);
+    float dtx = vx * dx / (x2 - x1);
+    float t1x = t0x + dtx;
 
     float dy = u.font.glyph_height;
     float y1 = glyph.y_offset;
     float y2 = y1 + glyph.height;
-    float t0y = y1 / (y1 - y2);
-    float t1y = -dy / (y1 - y2);
+    float vy = glyph.height;
+    float t0y = vy * y1 / (y1 - y2);
+    float dty = vy * dy / (y2 - y1);
+    float t1y = t0y + dty;
 
     float tx = (p.x == 0 ? t0x : t1x);
     float ty = (p.y == 0 ? t0y : t1y);

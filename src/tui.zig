@@ -51,7 +51,7 @@ pub const Tui = struct {
         const font = try ft.build_atlas(
             alloc,
             "font/Inconsolata-Regular.ttf",
-            40,
+            28,
             512,
         );
         const renderer = try Renderer.init(tmp_alloc, window.window, &font);

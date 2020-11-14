@@ -50,7 +50,11 @@ pub const Atlas = struct {
         try status_to_err(c.FT_Load_Char(
             self.face,
             codepoint,
-            c.FT_LOAD_RENDER | c.FT_LOAD_TARGET_LIGHT,
+            0,
+        ));
+        try status_to_err(c.FT_Render_Glyph(
+            self.face.*.glyph,
+            @intToEnum(c.FT_Render_Mode, c.FT_RENDER_MODE_NORMAL),
         ));
         const glyph = self.face.*.glyph;
         const bmp = &(glyph.*.bitmap);

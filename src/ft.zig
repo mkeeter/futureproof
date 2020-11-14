@@ -2,62 +2,77 @@ const std = @import("std");
 const c = @import("c.zig");
 
 pub const Atlas = struct {
-    u: c.fpAtlasUniforms,
+    const Self = @This();
+
+    alloc: *std.mem.Allocator,
+
+    // Font atlas texture
     tex: []u8,
     tex_size: u32,
-};
 
-pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, font_size: u32, tex_size: u32) !Atlas {
-    var ft: c.FT_Library = null;
-    var face: c.FT_Face = null;
+    // Position within the atlas texture
+    x: u32,
+    y: u32,
+    max_row_height: u32,
+    glyph_index: u32,
 
-    try status_to_err(c.FT_Init_FreeType(&ft));
-    defer status_to_err(c.FT_Done_FreeType(ft)) catch |err| {
-        std.debug.panic("Could not destroy library: {}", .{err});
-    };
+    // Conversion from codepoint to position in u.glyphs
+    table: std.hash_map.AutoHashMapUnmanaged(u32, u32),
 
-    try status_to_err(c.FT_New_Face(ft, font_name.ptr, 0, &face));
-    try status_to_err(c.FT_Set_Pixel_Sizes(face, @intCast(c_uint, font_size), @intCast(c_uint, font_size)));
+    // Freetype state
+    ft: c.FT_Library,
+    face: c.FT_Face,
 
-    // Track position within the texture atlas
-    var x: u32 = 1;
-    var y: u32 = 1;
-    var max_height: u32 = 0;
+    // Uniforms (synchronized with the GPU)
+    u: c.fpAtlasUniforms,
 
-    const tex = try alloc.alloc(u8, tex_size * tex_size);
-    std.mem.set(u8, tex, 128);
-    var out = Atlas{
-        .tex = tex,
-        .tex_size = tex_size,
-        .u = undefined,
-    };
-    out.u.glyph_height = font_size;
+    pub fn deinit(self: *Self) void {
+        status_to_err(c.FT_Done_FreeType(self.ft)) catch |err| {
+            std.debug.panic("Could not destroy library: {}", .{err});
+        };
+        self.alloc.free(self.tex);
+        self.table.deinit(self.alloc);
+    }
 
-    var i: u8 = 0;
-    var baseline: i32 = 0;
-    while (i < 128) : (i += 1) {
-        try status_to_err(c.FT_Load_Char(face, i, c.FT_LOAD_RENDER | c.FT_LOAD_TARGET_LIGHT));
-        const bmp = &(face.*.glyph.*.bitmap);
+    pub fn get_glyph(self: *Self, codepoint: u32) ?u32 {
+        if (codepoint < 127) {
+            return codepoint;
+        }
+        return self.table.get(codepoint);
+    }
+
+    pub fn add_glyph(self: *Self, codepoint: u32) !u32 {
+        // New glyphs go at the back of the glyphs table
+        const g = self.glyph_index;
+        try self.table.put(self.alloc, codepoint, g);
+        self.glyph_index += 1;
+
+        try status_to_err(c.FT_Load_Char(
+            self.face,
+            codepoint,
+            c.FT_LOAD_RENDER | c.FT_LOAD_TARGET_LIGHT,
+        ));
+        const bmp = &(self.face.*.glyph.*.bitmap);
 
         { // Store the glyph advance
-            const g = @intCast(u32, face.*.glyph.*.advance.x >> 6);
-            if (i == 0) {
-                out.u.glyph_advance = g;
-            } else if (g != out.u.glyph_advance) {
+            const advance = @intCast(u32, self.face.*.glyph.*.advance.x >> 6);
+            if (codepoint == 0) {
+                self.u.glyph_advance = advance;
+            } else if (advance != self.u.glyph_advance) {
                 std.debug.panic("Inconsistent glyph advance; is font not fixed-width?", .{});
             }
         }
 
         // Reset to the beginning of the line
-        if (x + bmp.*.width >= tex_size) {
-            y += max_height;
-            x = 1;
-            max_height = 0;
+        if (self.x + bmp.*.width >= self.tex_size) {
+            self.y += self.max_row_height;
+            self.x = 1;
+            self.max_row_height = 0;
         }
-        if (y + bmp.*.rows >= tex_size) {
+        if (self.y + bmp.*.rows >= self.tex_size) {
             std.debug.panic("Ran out of atlas space", .{});
-        } else if (bmp.*.rows > max_height) {
-            max_height = bmp.*.rows;
+        } else if (bmp.*.rows > self.max_row_height) {
+            self.max_row_height = bmp.*.rows;
         }
         var row: usize = 0;
         const pitch: usize = @intCast(usize, bmp.*.pitch);
@@ -65,35 +80,62 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
             var col: usize = 0;
             while (col < bmp.*.width) : (col += 1) {
                 const p: u8 = bmp.*.buffer[row * pitch + col];
-                out.tex[x + col + tex_size * (row + y)] = p;
+                self.tex[self.x + col + self.tex_size * (row + self.y)] = p;
             }
         }
         const glyph = c.fpGlyph{
-            .x0 = x,
-            .y0 = y,
+            .x0 = self.x,
+            .y0 = self.y,
             .width = bmp.*.width,
             .height = bmp.*.rows,
-            .x_offset = face.*.glyph.*.bitmap_left,
-            .y_offset = face.*.glyph.*.bitmap_top - @intCast(i32, bmp.*.rows),
+            .x_offset = self.face.*.glyph.*.bitmap_left,
+            .y_offset = self.face.*.glyph.*.bitmap_top - @intCast(i32, bmp.*.rows),
         };
 
-        // Track the lowest glyph baseilne
-        if (glyph.y_offset < baseline) {
-            baseline = glyph.y_offset;
-        }
+        self.u.glyphs[g] = glyph;
+        self.x += bmp.*.width;
 
-        out.u.glyphs[i] = glyph;
-        x += bmp.*.width;
+        return g;
     }
+};
 
-    i = 0;
-    while (i < out.u.glyphs.len) : (i += 1) {
-        out.u.glyphs[i].y_offset -= baseline;
+pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, font_size: u32, tex_size: u32) !Atlas {
+    const tex = try alloc.alloc(u8, tex_size * tex_size);
+    std.mem.set(u8, tex, 128);
+    var out = Atlas{
+        .alloc = alloc,
+
+        .tex = tex,
+        .tex_size = tex_size,
+
+        .x = 1,
+        .y = 1,
+        .glyph_index = 0,
+        .max_row_height = 0,
+
+        // Freetype handles
+        .ft = undefined,
+        .face = undefined,
+
+        .table = std.hash_map.AutoHashMapUnmanaged(u32, u32).init(alloc),
+
+        // GPU uniforms
+        .u = undefined,
+    };
+    out.u.glyph_height = font_size;
+
+    try status_to_err(c.FT_Init_FreeType(&out.ft));
+    try status_to_err(c.FT_New_Face(out.ft, font_name.ptr, 0, &out.face));
+    try status_to_err(c.FT_Set_Pixel_Sizes(
+        out.face,
+        @intCast(c_uint, font_size),
+        @intCast(c_uint, font_size),
+    ));
+
+    var i: u8 = 0;
+    while (i < 128) : (i += 1) {
+        _ = try out.add_glyph(i);
     }
-
-    std.debug.print("Font uniforms: {}\n", .{out.u});
-    std.debug.print("baseline: {}\n", .{baseline});
-    std.debug.print("'[': {}\n", .{out.u.glyphs['[']});
 
     return out;
 }

@@ -20,6 +20,7 @@ pub const Tui = struct {
     window: Window,
     renderer: Renderer,
     rpc: RPC,
+    font: ft.Atlas,
 
     char_grid: [512 * 512]u32,
     x_tiles: u32,
@@ -31,6 +32,7 @@ pub const Tui = struct {
 
     pub fn deinit(self: *Tui) void {
         self.rpc.deinit();
+        self.font.deinit();
         self.alloc.destroy(self);
     }
 
@@ -47,7 +49,7 @@ pub const Tui = struct {
         c.glfwGetFramebufferSize(window.window, &width, &height);
 
         const font = try ft.build_atlas(
-            tmp_alloc,
+            alloc,
             "font/Inconsolata-Regular.ttf",
             40,
             512,
@@ -68,6 +70,7 @@ pub const Tui = struct {
             .window = window,
             .renderer = renderer,
             .rpc = rpc,
+            .font = font,
 
             .char_grid = undefined,
             .x_tiles = 0,

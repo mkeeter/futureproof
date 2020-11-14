@@ -14,7 +14,7 @@ struct fpGlyph {
     int32_t x_offset, y_offset;
 };
 struct fpAtlasUniforms {
-    MEMBER_STRUCT fpGlyph glyphs[128];
+    MEMBER_STRUCT fpGlyph glyphs[256];
     uint32_t glyph_height;
     uint32_t glyph_advance;
 };

@@ -89,7 +89,7 @@ pub const Atlas = struct {
             .width = bmp.*.width,
             .height = bmp.*.rows,
             .x_offset = self.face.*.glyph.*.bitmap_left,
-            .y_offset = self.face.*.glyph.*.bitmap_top - @intCast(i32, bmp.*.rows),
+            .y_offset = self.face.*.glyph.*.bitmap_top - @intCast(i32, bmp.*.rows) - @intCast(i32, self.face.*.size.*.metrics.descender >> 6),
         };
 
         self.u.glyphs[g] = glyph;

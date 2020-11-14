@@ -7,7 +7,7 @@ pub const Atlas = struct {
     alloc: *std.mem.Allocator,
 
     // Font atlas texture
-    tex: []u8,
+    tex: []u32,
     tex_size: u32,
 
     // Position within the atlas texture
@@ -54,7 +54,7 @@ pub const Atlas = struct {
         ));
         try status_to_err(c.FT_Render_Glyph(
             self.face.*.glyph,
-            @intToEnum(c.FT_Render_Mode, c.FT_RENDER_MODE_NORMAL),
+            @intToEnum(c.FT_Render_Mode, c.FT_RENDER_MODE_LCD),
         ));
         const glyph = self.face.*.glyph;
         const bmp = &(glyph.*.bitmap);
@@ -68,8 +68,11 @@ pub const Atlas = struct {
             }
         }
 
+        // Calculate true width (ignoring RGB, which triples width)
+        const bmp_width = bmp.*.width / 3;
+
         // Reset to the beginning of the line
-        if (self.x + bmp.*.width >= self.tex_size) {
+        if (self.x + bmp_width >= self.tex_size) {
             self.y += self.max_row_height;
             self.x = 1;
             self.max_row_height = 0;
@@ -83,8 +86,11 @@ pub const Atlas = struct {
         const pitch: usize = @intCast(usize, bmp.*.pitch);
         while (row < bmp.*.rows) : (row += 1) {
             var col: usize = 0;
-            while (col < bmp.*.width) : (col += 1) {
-                const p: u8 = bmp.*.buffer[row * pitch + col];
+            while (col < bmp_width) : (col += 1) {
+                const p: u32 = 0 |
+                    @intCast(u32, bmp.*.buffer[row * pitch + col * 3]) |
+                    (@intCast(u32, bmp.*.buffer[row * pitch + col * 3 + 1]) << 8) |
+                    (@intCast(u32, bmp.*.buffer[row * pitch + col * 3 + 2]) << 16);
                 self.tex[self.x + col + self.tex_size * (row + self.y)] = p;
             }
         }
@@ -92,7 +98,7 @@ pub const Atlas = struct {
         self.u.glyphs[g] = c.fpGlyph{
             .x0 = self.x,
             .y0 = self.y,
-            .width = bmp.*.width,
+            .width = bmp_width,
             .height = bmp.*.rows,
             .x_offset = glyph.*.bitmap_left,
             .y_offset = glyph.*.bitmap_top - @intCast(i32, bmp.*.rows) - offset,
@@ -104,8 +110,8 @@ pub const Atlas = struct {
 };
 
 pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, font_size: u32, tex_size: u32) !Atlas {
-    const tex = try alloc.alloc(u8, tex_size * tex_size);
-    std.mem.set(u8, tex, 128);
+    const tex = try alloc.alloc(u32, tex_size * tex_size);
+    std.mem.set(u32, tex, 128);
     var out = Atlas{
         .alloc = alloc,
 

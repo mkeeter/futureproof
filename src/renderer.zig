@@ -105,7 +105,7 @@ pub const Renderer = struct {
             .mip_level_count = 1,
             .sample_count = 1,
             .dimension = @intToEnum(c.WGPUTextureDimension, c.WGPUTextureDimension_D2),
-            .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_R8Unorm),
+            .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_Rgba8Unorm),
             // SAMPLED tells wgpu that we want to use this texture in shaders
             // COPY_DST means that we want to copy data to this texture
             .usage = c.WGPUTextureUsage_SAMPLED | c.WGPUTextureUsage_COPY_DST,
@@ -115,7 +115,7 @@ pub const Renderer = struct {
         const tex_view = c.wgpu_texture_create_view(tex, &(c.WGPUTextureViewDescriptor){
             .label = "font_atlas_view",
             .dimension = @intToEnum(c.WGPUTextureViewDimension, c.WGPUTextureViewDimension_D2),
-            .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_R8Unorm),
+            .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_Rgba8Unorm),
             .aspect = @intToEnum(c.WGPUTextureAspect, c.WGPUTextureAspect_All),
             .base_mip_level = 0,
             .level_count = 1,
@@ -163,7 +163,7 @@ pub const Renderer = struct {
                 .multisampled = false,
                 .view_dimension = @intToEnum(c.WGPUTextureViewDimension, c.WGPUTextureViewDimension_D2),
                 .texture_component_type = @intToEnum(c.WGPUTextureComponentType, c.WGPUTextureComponentType_Uint),
-                .storage_texture_format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_R8Unorm),
+                .storage_texture_format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_Rgba8Unorm),
 
                 .count = undefined,
                 .has_dynamic_offset = undefined,
@@ -344,15 +344,22 @@ pub const Renderer = struct {
             .height = @intCast(u32, font.tex_size),
             .depth = 1,
         };
-        c.wgpu_queue_write_texture(self.queue, &(c.WGPUTextureCopyView){
-            .texture = self.tex,
-            .mip_level = 0,
-            .origin = (c.WGPUOrigin3d){ .x = 0, .y = 0, .z = 0 },
-        }, font.tex.ptr, font.tex.len, &(c.WGPUTextureDataLayout){
-            .offset = 0,
-            .bytes_per_row = @intCast(u32, font.tex_size),
-            .rows_per_image = @intCast(u32, font.tex_size),
-        }, &tex_size);
+        c.wgpu_queue_write_texture(
+            self.queue,
+            &(c.WGPUTextureCopyView){
+                .texture = self.tex,
+                .mip_level = 0,
+                .origin = (c.WGPUOrigin3d){ .x = 0, .y = 0, .z = 0 },
+            },
+            @ptrCast([*]const u8, font.tex.ptr),
+            font.tex.len * @sizeOf(u32),
+            &(c.WGPUTextureDataLayout){
+                .offset = 0,
+                .bytes_per_row = @intCast(u32, font.tex_size) * @sizeOf(u32),
+                .rows_per_image = @intCast(u32, font.tex_size) * @sizeOf(u32),
+            },
+            &tex_size,
+        );
     }
 
     pub fn redraw(self: *Self, total_tiles: u32) void {

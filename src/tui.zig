@@ -163,7 +163,25 @@ pub const Tui = struct {
             const cell = cell_.Array;
             const text = cell[0].RawString;
             const repeat = if (cell.len >= 3) cell[2].UInt else 1;
-            const char = decode_utf8(text);
+            const codepoint = decode_utf8(text);
+
+            var char: u32 = undefined;
+            if (self.font.get_glyph(codepoint)) |g| {
+                char = g;
+            } else {
+                std.debug.print("Adding new codepoint: {x}\n", .{codepoint});
+                char = self.font.add_glyph(codepoint) catch |err| {
+                    std.debug.panic("Could not add glyph {}: {}\n", .{ codepoint, err });
+                };
+                // We've only added one glyph to the texture, so just copy
+                // this one line over to our local uniforms:
+                self.u.font.glyphs[char] = self.font.u.glyphs[char];
+
+                // Then send the updated atlas and texture to the GPU
+                self.renderer.update_uniforms(&self.u);
+                self.renderer.update_font_tex(&self.font);
+            }
+
             var i: usize = 0;
             while (i < repeat) : (i += 1) {
                 self.char_at(col, row).* = char;

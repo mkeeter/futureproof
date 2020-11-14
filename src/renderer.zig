@@ -111,16 +111,6 @@ pub const Renderer = struct {
             .usage = c.WGPUTextureUsage_SAMPLED | c.WGPUTextureUsage_COPY_DST,
             .label = "font_atlas",
         });
-        const queue = c.wgpu_device_get_default_queue(device);
-        c.wgpu_queue_write_texture(queue, &(c.WGPUTextureCopyView){
-            .texture = tex,
-            .mip_level = 0,
-            .origin = (c.WGPUOrigin3d){ .x = 0, .y = 0, .z = 0 },
-        }, font.tex.ptr, font.tex.len, &(c.WGPUTextureDataLayout){
-            .offset = 0,
-            .bytes_per_row = @intCast(u32, font.tex_size),
-            .rows_per_image = @intCast(u32, font.tex_size),
-        }, &tex_size);
 
         const tex_view = c.wgpu_texture_create_view(tex, &(c.WGPUTextureViewDescriptor){
             .label = "font_atlas_view",
@@ -323,7 +313,7 @@ pub const Renderer = struct {
             .alpha_to_coverage_enabled = false,
         });
 
-        return Renderer{
+        var out = Renderer{
             .tex = tex,
             .tex_view = tex_view,
             .tex_sampler = tex_sampler,
@@ -333,7 +323,7 @@ pub const Renderer = struct {
             .device = device,
             .surface = surface,
 
-            .queue = queue,
+            .queue = c.wgpu_device_get_default_queue(device),
 
             .bind_group = bind_group,
             .bind_group_layout = bind_group_layout,
@@ -343,6 +333,26 @@ pub const Renderer = struct {
             .render_pipeline = render_pipeline,
             .pipeline_layout = pipeline_layout,
         };
+
+        out.update_font_tex(font);
+        return out;
+    }
+
+    pub fn update_font_tex(self: *Self, font: *const ft.Atlas) void {
+        const tex_size = (c.WGPUExtent3d){
+            .width = @intCast(u32, font.tex_size),
+            .height = @intCast(u32, font.tex_size),
+            .depth = 1,
+        };
+        c.wgpu_queue_write_texture(self.queue, &(c.WGPUTextureCopyView){
+            .texture = self.tex,
+            .mip_level = 0,
+            .origin = (c.WGPUOrigin3d){ .x = 0, .y = 0, .z = 0 },
+        }, font.tex.ptr, font.tex.len, &(c.WGPUTextureDataLayout){
+            .offset = 0,
+            .bytes_per_row = @intCast(u32, font.tex_size),
+            .rows_per_image = @intCast(u32, font.tex_size),
+        }, &tex_size);
     }
 
     pub fn redraw(self: *Self, total_tiles: u32) void {

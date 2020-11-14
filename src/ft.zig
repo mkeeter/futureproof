@@ -52,10 +52,11 @@ pub const Atlas = struct {
             codepoint,
             c.FT_LOAD_RENDER | c.FT_LOAD_TARGET_LIGHT,
         ));
-        const bmp = &(self.face.*.glyph.*.bitmap);
+        const glyph = self.face.*.glyph;
+        const bmp = &(glyph.*.bitmap);
 
         { // Store the glyph advance
-            const advance = @intCast(u32, self.face.*.glyph.*.advance.x >> 6);
+            const advance = @intCast(u32, glyph.*.advance.x >> 6);
             if (codepoint == 0) {
                 self.u.glyph_advance = advance;
             } else if (advance != self.u.glyph_advance) {
@@ -83,16 +84,15 @@ pub const Atlas = struct {
                 self.tex[self.x + col + self.tex_size * (row + self.y)] = p;
             }
         }
-        const glyph = c.fpGlyph{
+        const offset = @intCast(i32, self.face.*.size.*.metrics.descender >> 6);
+        self.u.glyphs[g] = c.fpGlyph{
             .x0 = self.x,
             .y0 = self.y,
             .width = bmp.*.width,
             .height = bmp.*.rows,
-            .x_offset = self.face.*.glyph.*.bitmap_left,
-            .y_offset = self.face.*.glyph.*.bitmap_top - @intCast(i32, bmp.*.rows) - @intCast(i32, self.face.*.size.*.metrics.descender >> 6),
+            .x_offset = glyph.*.bitmap_left,
+            .y_offset = glyph.*.bitmap_top - @intCast(i32, bmp.*.rows) - offset,
         };
-
-        self.u.glyphs[g] = glyph;
         self.x += bmp.*.width;
 
         return g;

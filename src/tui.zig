@@ -338,9 +338,10 @@ pub const Tui = struct {
         self.renderer.resize_swap_chain(self.u.width_px, self.u.height_px);
         self.renderer.update_uniforms(&self.u);
 
-        const x_tiles = self.u.width_px / self.u.font.glyph_advance;
-        const y_tiles = self.u.height_px / self.u.font.glyph_height;
-        const reply = self.rpc.call("nvim_ui_try_resize", .{ x_tiles, y_tiles }) catch |err| {
+        const reply = self.rpc.call(
+            "nvim_ui_try_resize",
+            .{ self.x_tiles, self.y_tiles },
+        ) catch |err| {
             std.debug.panic("Failed to resize UI: {}\n", .{err});
         };
         defer reply.destroy(self.alloc);

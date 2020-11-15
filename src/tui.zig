@@ -81,6 +81,9 @@ pub const Tui = struct {
                 .width_px = @intCast(u32, width),
                 .height_px = @intCast(u32, height),
                 .font = font.u,
+
+                .attrs = undefined,
+                .defaults = undefined,
             },
         };
         window.set_callbacks(size_cb, key_cb, @ptrCast(?*c_void, out));
@@ -213,10 +216,38 @@ pub const Tui = struct {
         const id = cmd[0].UInt;
         const rgb_attr = cmd[1].Map;
         // Ignore cterm_attr
-        std.debug.print("{}:\n", .{id});
+
+        // Reset this attribute to default values
+        self.u.attrs[id] = (c.fpHlAttrs){
+            .foreground = 0xFFFFFFFF,
+            .background = 0xFFFFFFFF,
+            .special = 0xFFFFFFFF,
+            .flags = 0,
+        };
+
         var itr = rgb_attr.iterator();
         while (itr.next()) |entry| {
-            std.debug.print("    {} {}\n", .{ entry.key, entry.value });
+            if (std.mem.eql(u8, entry.key.RawString, "foreground")) {
+                self.u.attrs[id].foreground = @intCast(u32, entry.value.UInt);
+            } else if (std.mem.eql(u8, entry.key.RawString, "background")) {
+                self.u.attrs[id].background = @intCast(u32, entry.value.UInt);
+            } else if (std.mem.eql(u8, entry.key.RawString, "special")) {
+                self.u.attrs[id].special = @intCast(u32, entry.value.UInt);
+            } else if (std.mem.eql(u8, entry.key.RawString, "bold") and entry.value.Boolean) {
+                self.u.attrs[id].flags |= c.FP_FLAG_BOLD;
+            } else if (std.mem.eql(u8, entry.key.RawString, "italic") and entry.value.Boolean) {
+                self.u.attrs[id].flags |= c.FP_FLAG_ITALIC;
+            } else if (std.mem.eql(u8, entry.key.RawString, "undercurl") and entry.value.Boolean) {
+                self.u.attrs[id].flags |= c.FP_FLAG_UNDERCURL;
+            } else if (std.mem.eql(u8, entry.key.RawString, "reverse") and entry.value.Boolean) {
+                self.u.attrs[id].flags |= c.FP_FLAG_REVERSE;
+            } else if (std.mem.eql(u8, entry.key.RawString, "underline") and entry.value.Boolean) {
+                self.u.attrs[id].flags |= c.FP_FLAG_UNDERLINE;
+            } else if (std.mem.eql(u8, entry.key.RawString, "strikethrough") and entry.value.Boolean) {
+                self.u.attrs[id].flags |= c.FP_FLAG_STRIKETHROUGH;
+            } else {
+                std.debug.warn("Unknown hlAttr: {} {}\n", .{ entry.key, entry.value });
+            }
         }
     }
 
@@ -249,6 +280,7 @@ pub const Tui = struct {
                     for (cmd.Array[1..]) |v| {
                         self.api_hl_attr_define(v.Array);
                     }
+                    self.renderer.update_uniforms(&self.u);
                 } else {
                     std.debug.print("Unimplemented: {}\n", .{cmd.Array[0]});
                 }

@@ -32,9 +32,15 @@ struct fpHlAttrs {
     uint32_t special;
     uint32_t flags;
 };
+struct fpDefaultColors {
+    uint32_t foreground;
+    uint32_t background;
+    uint32_t special;
+};
 struct fpUniforms {
     uint32_t width_px;
     uint32_t height_px;
     MEMBER_STRUCT fpAtlasUniforms font;
     MEMBER_STRUCT fpHlAttrs attrs[256];
+    MEMBER_STRUCT fpDefaultColors defaults;
 };

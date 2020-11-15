@@ -209,6 +209,17 @@ pub const Tui = struct {
         self.char_grid[self.total_tiles + 1] = @intCast(u32, cmd[1].UInt);
     }
 
+    fn api_hl_attr_define(self: *Self, cmd: []const msgpack.Value) void {
+        const id = cmd[0].UInt;
+        const rgb_attr = cmd[1].Map;
+        // Ignore cterm_attr
+        std.debug.print("{}:\n", .{id});
+        var itr = rgb_attr.iterator();
+        while (itr.next()) |entry| {
+            std.debug.print("    {} {}\n", .{ entry.key, entry.value });
+        }
+    }
+
     pub fn tick(self: *Self) !bool {
         while (self.rpc.get_event()) |event| {
             if (event == .Int) {
@@ -234,6 +245,10 @@ pub const Tui = struct {
                     }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "mouse_on")) {
                     // Ignored, because UIs are allowed to always send mouse input
+                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "hl_attr_define")) {
+                    for (cmd.Array[1..]) |v| {
+                        self.api_hl_attr_define(v.Array);
+                    }
                 } else {
                     std.debug.print("Unimplemented: {}\n", .{cmd.Array[0]});
                 }

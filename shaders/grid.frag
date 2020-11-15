@@ -5,7 +5,8 @@
 
 layout(location=0) in  vec2 v_tex_coords;
 layout(location=1) in flat uint v_ascii;
-layout(location=2) in flat uint v_cursor;
+layout(location=2) in flat uint v_hl_attr;
+layout(location=3) in flat uint v_cursor;
 
 layout(location=0) out vec4 out_color;
 
@@ -20,8 +21,6 @@ void main() {
 
     if (v_cursor != 0) {
         out_color = vec4(1.0, 1.0, 1.0, 1.0);
-    } else if (v_ascii == 32 || v_ascii == 0) { // SPACE or NULL
-        out_color = vec4(0.0, 0.0, 0.0, 1.0);
     } else if (v_tex_coords.x >= 0 && v_tex_coords.x < glyph.width &&
                v_tex_coords.y > 0 && v_tex_coords.y <= glyph.height)
     {

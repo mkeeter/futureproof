@@ -86,6 +86,13 @@ pub const Tui = struct {
                 .defaults = undefined,
             },
         };
+        // Set the default hl attrs for slot 0
+        out.u.attrs[0] = (c.fpHlAttrs){
+            .foreground = 0xFFFFFFFF,
+            .background = 0xFFFFFFFF,
+            .special = 0xFFFFFFFF,
+            .flags = 0,
+        };
         window.set_callbacks(size_cb, key_cb, @ptrCast(?*c_void, out));
 
         // Attach the UI via RPC
@@ -159,12 +166,16 @@ pub const Tui = struct {
     fn api_grid_line(self: *Self, line: []const msgpack.Value) void {
         const grid = line[0].UInt;
         std.debug.assert(grid == 1);
+        var hl_attr: u16 = 0;
 
         const row = line[1].UInt;
         var col = line[2].UInt;
         for (line[3].Array) |cell_| {
             const cell = cell_.Array;
             const text = cell[0].RawString;
+            if (cell.len >= 2) {
+                hl_attr = @intCast(u16, cell[1].UInt);
+            }
             const repeat = if (cell.len >= 3) cell[2].UInt else 1;
             const codepoint = decode_utf8(text);
 
@@ -185,9 +196,10 @@ pub const Tui = struct {
                 self.renderer.update_font_tex(&self.font);
             }
 
+            std.debug.assert(char < self.u.font.glyphs.len);
             var i: usize = 0;
             while (i < repeat) : (i += 1) {
-                self.char_at(col, row).* = char;
+                self.char_at(col, row).* = char | (@intCast(u32, hl_attr) << 16);
                 col += 1; // TODO: unicode?!
             }
         }
@@ -214,6 +226,7 @@ pub const Tui = struct {
 
     fn api_hl_attr_define(self: *Self, cmd: []const msgpack.Value) void {
         const id = cmd[0].UInt;
+        std.debug.print("Setting hilight mode for {}\n", .{id});
         const rgb_attr = cmd[1].Map;
         // Ignore cterm_attr
 

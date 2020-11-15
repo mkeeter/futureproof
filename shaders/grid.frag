@@ -27,7 +27,8 @@ void main() {
     {
         ivec2 i = ivec2(glyph.x0 + v_tex_coords.x,
                         glyph.y0 + glyph.height - v_tex_coords.y);
-        out_color = vec4(texelFetch(sampler2D(font_tex, font_sampler), i, 0).rgb, 1.0);
+        vec3 t = texelFetch(sampler2D(font_tex, font_sampler), i, 0).rgb;
+        out_color = vec4(pow(t, vec3(1/2.2)), 1.0); // gamma correction
     } else {
         out_color = vec4(0, 0, 0, 1.0);
     }

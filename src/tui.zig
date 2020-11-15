@@ -83,15 +83,7 @@ pub const Tui = struct {
                 .font = font.u,
 
                 .attrs = undefined,
-                .defaults = undefined,
             },
-        };
-        // Set the default hl attrs for slot 0
-        out.u.attrs[0] = (c.fpHlAttrs){
-            .foreground = 0xFFFFFFFF,
-            .background = 0xFFFFFFFF,
-            .special = 0xFFFFFFFF,
-            .flags = 0,
         };
         window.set_callbacks(size_cb, key_cb, @ptrCast(?*c_void, out));
 
@@ -224,47 +216,57 @@ pub const Tui = struct {
         self.char_grid[self.total_tiles + 1] = @intCast(u32, cmd[1].UInt);
     }
 
-    fn api_hl_attr_define(self: *Self, cmd: []const msgpack.Value) void {
-        const id = cmd[0].UInt;
-        std.debug.print("Setting hilight mode for {}\n", .{id});
-        const rgb_attr = cmd[1].Map;
-        // Ignore cterm_attr
-
-        // Reset this attribute to default values
-        self.u.attrs[id] = (c.fpHlAttrs){
-            .foreground = 0xFFFFFFFF,
-            .background = 0xFFFFFFFF,
-            .special = 0xFFFFFFFF,
+    fn decode_hl_attrs(attr: *const msgpack.KeyValueMap) c.fpHlAttrs {
+        var out = (c.fpHlAttrs){
+            .foreground = 0xffffffff,
+            .background = 0xffffffff,
+            .special = 0xffffffff,
             .flags = 0,
         };
 
-        var itr = rgb_attr.iterator();
+        var itr = attr.iterator();
         while (itr.next()) |entry| {
             if (std.mem.eql(u8, entry.key.RawString, "foreground")) {
-                self.u.attrs[id].foreground = @intCast(u32, entry.value.UInt);
+                out.foreground = @intCast(u32, entry.value.UInt);
             } else if (std.mem.eql(u8, entry.key.RawString, "background")) {
-                self.u.attrs[id].background = @intCast(u32, entry.value.UInt);
+                out.background = @intCast(u32, entry.value.UInt);
             } else if (std.mem.eql(u8, entry.key.RawString, "special")) {
-                self.u.attrs[id].special = @intCast(u32, entry.value.UInt);
+                out.special = @intCast(u32, entry.value.UInt);
             } else if (std.mem.eql(u8, entry.key.RawString, "bold") and entry.value.Boolean) {
-                self.u.attrs[id].flags |= c.FP_FLAG_BOLD;
+                out.flags |= c.FP_FLAG_BOLD;
             } else if (std.mem.eql(u8, entry.key.RawString, "italic") and entry.value.Boolean) {
-                self.u.attrs[id].flags |= c.FP_FLAG_ITALIC;
+                out.flags |= c.FP_FLAG_ITALIC;
             } else if (std.mem.eql(u8, entry.key.RawString, "undercurl") and entry.value.Boolean) {
-                self.u.attrs[id].flags |= c.FP_FLAG_UNDERCURL;
+                out.flags |= c.FP_FLAG_UNDERCURL;
             } else if (std.mem.eql(u8, entry.key.RawString, "reverse") and entry.value.Boolean) {
-                self.u.attrs[id].flags |= c.FP_FLAG_REVERSE;
+                out.flags |= c.FP_FLAG_REVERSE;
             } else if (std.mem.eql(u8, entry.key.RawString, "underline") and entry.value.Boolean) {
-                self.u.attrs[id].flags |= c.FP_FLAG_UNDERLINE;
+                out.flags |= c.FP_FLAG_UNDERLINE;
             } else if (std.mem.eql(u8, entry.key.RawString, "strikethrough") and entry.value.Boolean) {
-                self.u.attrs[id].flags |= c.FP_FLAG_STRIKETHROUGH;
+                out.flags |= c.FP_FLAG_STRIKETHROUGH;
             } else {
                 std.debug.warn("Unknown hlAttr: {} {}\n", .{ entry.key, entry.value });
             }
         }
+        return out;
+    }
+
+    fn api_hl_attr_define(self: *Self, cmd: []const msgpack.Value) void {
+        // Decode rgb_attrs into the appropriate slot
+        self.u.attrs[cmd[0].UInt] = decode_hl_attrs(&cmd[1].Map);
+    }
+
+    fn api_default_colors_set(self: *Self, cmd: []const msgpack.Value) void {
+        self.u.attrs[0] = (c.fpHlAttrs){
+            .foreground = @intCast(u32, cmd[0].UInt),
+            .background = @intCast(u32, cmd[1].UInt),
+            .special = @intCast(u32, cmd[2].UInt),
+            .flags = 0,
+        };
     }
 
     pub fn tick(self: *Self) !bool {
+        var uniforms_changed = false;
         while (self.rpc.get_event()) |event| {
             if (event == .Int) {
                 return false;
@@ -293,7 +295,12 @@ pub const Tui = struct {
                     for (cmd.Array[1..]) |v| {
                         self.api_hl_attr_define(v.Array);
                     }
-                    self.renderer.update_uniforms(&self.u);
+                    uniforms_changed = true;
+                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "default_colors_set")) {
+                    for (cmd.Array[1..]) |v| {
+                        self.api_default_colors_set(v.Array);
+                    }
+                    uniforms_changed = true;
                 } else {
                     std.debug.print("Unimplemented: {}\n", .{cmd.Array[0]});
                 }
@@ -301,6 +308,9 @@ pub const Tui = struct {
             try self.rpc.release_event(event);
         }
 
+        if (uniforms_changed) {
+            self.renderer.update_uniforms(&self.u);
+        }
         self.renderer.redraw(self.total_tiles);
         return true;
     }

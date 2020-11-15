@@ -472,6 +472,28 @@ pub const Tui = struct {
         };
     }
 
+    // Helper function to convert a mod bitfield into a string
+    // alloc must be an arena allocator, for ease of memory management
+    fn encode_mods(alloc: *std.mem.Allocator, mods: c_int) ![]const u8 {
+        var out = try std.fmt.allocPrint(alloc, "", .{});
+        std.debug.assert(out.len == 0);
+
+        if ((mods & c.GLFW_MOD_SHIFT) != 0) {
+            out = try std.fmt.allocPrint(alloc, "S-{}", .{out});
+        }
+        if ((mods & c.GLFW_MOD_CONTROL) != 0) {
+            out = try std.fmt.allocPrint(alloc, "C-{}", .{out});
+        }
+        if ((mods & c.GLFW_MOD_ALT) != 0) {
+            out = try std.fmt.allocPrint(alloc, "A-{}", .{out});
+        }
+        if ((mods & c.GLFW_MOD_ALT) != 0) {
+            out = try std.fmt.allocPrint(alloc, "D-{}", .{out});
+        }
+        std.debug.assert(out.len != 0);
+        return out;
+    }
+
     pub fn on_key(self: *Self, key: c_int, mods: c_int) !void {
         var arena = std.heap.ArenaAllocator.init(self.alloc);
         var alloc: *std.mem.Allocator = &arena.allocator;
@@ -485,17 +507,22 @@ pub const Tui = struct {
         } else if (get_ascii(key, mods)) |char| {
             if (char == '<') {
                 str = "<LT>";
-            } else if ((mods & (~@intCast(c_int, c.GLFW_MOD_SHIFT))) == 0) {
+            } else {
                 char_str[0] = char;
                 str = &char_str;
-            } else {
-                std.debug.print("Cannot handle mods yet\n", .{});
+            }
+
+            const mods_ = mods & (~@intCast(c_int, c.GLFW_MOD_SHIFT));
+            if (mods_ != 0) {
+                const mod_str = try encode_mods(alloc, mods_);
+                str = try std.fmt.allocPrint(alloc, "<{}{}>", .{ mod_str, str });
             }
         } else if (get_encoded(key)) |enc| {
             if (mods == 0) {
                 str = try std.fmt.allocPrint(alloc, "<{}>", .{enc});
             } else {
-                std.debug.print("Cannot handle mods yet\n", .{});
+                const mod_str = try encode_mods(alloc, mods);
+                str = try std.fmt.allocPrint(alloc, "<{}{}>", .{ mod_str, enc });
             }
         } else {
             std.debug.print("Got unknown key {} {}\n", .{ key, mods });

@@ -15,6 +15,7 @@ pub const Atlas = struct {
     y: u32,
     max_row_height: u32,
     glyph_index: u32,
+    has_advance: bool, // is the glyph advance stored in u.glyph_advance?
 
     // Conversion from codepoint to position in u.glyphs
     table: std.hash_map.AutoHashMapUnmanaged(u32, u32),
@@ -47,9 +48,13 @@ pub const Atlas = struct {
         try self.table.put(self.alloc, codepoint, g);
         self.glyph_index += 1;
 
-        try status_to_err(c.FT_Load_Char(
+        const char_index = c.FT_Get_Char_Index(self.face, codepoint);
+        if (char_index == 0) {
+            std.debug.warn("Could not get char for codepoint {x}\n", .{codepoint});
+        }
+        try status_to_err(c.FT_Load_Glyph(
             self.face,
-            codepoint,
+            char_index,
             0,
         ));
         try status_to_err(c.FT_Render_Glyph(
@@ -61,7 +66,8 @@ pub const Atlas = struct {
 
         { // Store the glyph advance
             const advance = @intCast(u32, glyph.*.advance.x >> 6);
-            if (codepoint == 0) {
+            if (!self.has_advance) {
+                self.has_advance = true;
                 self.u.glyph_advance = advance;
             } else if (advance != self.u.glyph_advance) {
                 std.debug.panic("Inconsistent glyph advance; is font not fixed-width?", .{});
@@ -120,8 +126,9 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
 
         .x = 1,
         .y = 1,
-        .glyph_index = 0,
+        .glyph_index = 32,
         .max_row_height = 0,
+        .has_advance = false,
 
         // Freetype handles
         .ft = undefined,
@@ -142,8 +149,8 @@ pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, fo
         @intCast(c_uint, font_size),
     ));
 
-    var i: u8 = 0;
-    while (i < 128) : (i += 1) {
+    var i = out.glyph_index;
+    while (i < 127) : (i += 1) {
         _ = try out.add_glyph(i);
     }
 

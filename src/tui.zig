@@ -407,51 +407,51 @@ pub const Tui = struct {
 
     fn get_encoded(key: c_int) ?([]const u8) {
         return switch (key) {
-            c.GLFW_KEY_ENTER => "<Enter>",
-            c.GLFW_KEY_ESCAPE => "<Esc>",
-            c.GLFW_KEY_TAB => "<Tab>",
-            c.GLFW_KEY_BACKSPACE => "<BS>",
-            c.GLFW_KEY_INSERT => "<Insert>",
-            c.GLFW_KEY_DELETE => "<Del>",
-            c.GLFW_KEY_RIGHT => "<Right>",
-            c.GLFW_KEY_LEFT => "<Left>",
-            c.GLFW_KEY_DOWN => "<Down>",
-            c.GLFW_KEY_UP => "<Up>",
-            c.GLFW_KEY_PAGE_UP => "<PageUp>",
-            c.GLFW_KEY_PAGE_DOWN => "<PageDown>",
-            c.GLFW_KEY_HOME => "<Home>",
-            c.GLFW_KEY_END => "<End>",
+            c.GLFW_KEY_ENTER => "Enter",
+            c.GLFW_KEY_ESCAPE => "Esc",
+            c.GLFW_KEY_TAB => "Tab",
+            c.GLFW_KEY_BACKSPACE => "BS",
+            c.GLFW_KEY_INSERT => "Insert",
+            c.GLFW_KEY_DELETE => "Del",
+            c.GLFW_KEY_RIGHT => "Right",
+            c.GLFW_KEY_LEFT => "Left",
+            c.GLFW_KEY_DOWN => "Down",
+            c.GLFW_KEY_UP => "Up",
+            c.GLFW_KEY_PAGE_UP => "PageUp",
+            c.GLFW_KEY_PAGE_DOWN => "PageDown",
+            c.GLFW_KEY_HOME => "Home",
+            c.GLFW_KEY_END => "End",
 
-            c.GLFW_KEY_F1 => "<F1>",
-            c.GLFW_KEY_F2 => "<F2>",
-            c.GLFW_KEY_F3 => "<F3>",
-            c.GLFW_KEY_F4 => "<F4>",
-            c.GLFW_KEY_F5 => "<F5>",
-            c.GLFW_KEY_F6 => "<F6>",
-            c.GLFW_KEY_F7 => "<F7>",
-            c.GLFW_KEY_F8 => "<F8>",
-            c.GLFW_KEY_F9 => "<F9>",
-            c.GLFW_KEY_F10 => "<F10>",
-            c.GLFW_KEY_F11 => "<F11>",
-            c.GLFW_KEY_F12 => "<F12>",
+            c.GLFW_KEY_F1 => "F1",
+            c.GLFW_KEY_F2 => "F2",
+            c.GLFW_KEY_F3 => "F3",
+            c.GLFW_KEY_F4 => "F4",
+            c.GLFW_KEY_F5 => "F5",
+            c.GLFW_KEY_F6 => "F6",
+            c.GLFW_KEY_F7 => "F7",
+            c.GLFW_KEY_F8 => "F8",
+            c.GLFW_KEY_F9 => "F9",
+            c.GLFW_KEY_F10 => "F10",
+            c.GLFW_KEY_F11 => "F11",
+            c.GLFW_KEY_F12 => "F12",
 
-            c.GLFW_KEY_KP_0 => "<k0>",
-            c.GLFW_KEY_KP_1 => "<k1>",
-            c.GLFW_KEY_KP_2 => "<k2>",
-            c.GLFW_KEY_KP_3 => "<k3>",
-            c.GLFW_KEY_KP_4 => "<k4>",
-            c.GLFW_KEY_KP_5 => "<k5>",
-            c.GLFW_KEY_KP_6 => "<k6>",
-            c.GLFW_KEY_KP_7 => "<k7>",
-            c.GLFW_KEY_KP_8 => "<k8>",
-            c.GLFW_KEY_KP_9 => "<k9>",
-            c.GLFW_KEY_KP_DECIMAL => "<kPoint>",
-            c.GLFW_KEY_KP_DIVIDE => "<kDivide>",
-            c.GLFW_KEY_KP_MULTIPLY => "<kMultiply>",
-            c.GLFW_KEY_KP_SUBTRACT => "<kSubtract>",
-            c.GLFW_KEY_KP_ADD => "<kAdd>",
-            c.GLFW_KEY_KP_ENTER => "<kEnter>",
-            c.GLFW_KEY_KP_EQUAL => "<kEqual>",
+            c.GLFW_KEY_KP_0 => "k0",
+            c.GLFW_KEY_KP_1 => "k1",
+            c.GLFW_KEY_KP_2 => "k2",
+            c.GLFW_KEY_KP_3 => "k3",
+            c.GLFW_KEY_KP_4 => "k4",
+            c.GLFW_KEY_KP_5 => "k5",
+            c.GLFW_KEY_KP_6 => "k6",
+            c.GLFW_KEY_KP_7 => "k7",
+            c.GLFW_KEY_KP_8 => "k8",
+            c.GLFW_KEY_KP_9 => "k9",
+            c.GLFW_KEY_KP_DECIMAL => "kPoint",
+            c.GLFW_KEY_KP_DIVIDE => "kDivide",
+            c.GLFW_KEY_KP_MULTIPLY => "kMultiply",
+            c.GLFW_KEY_KP_SUBTRACT => "kSubtract",
+            c.GLFW_KEY_KP_ADD => "kAdd",
+            c.GLFW_KEY_KP_ENTER => "kEnter",
+            c.GLFW_KEY_KP_EQUAL => "kEqual",
 
             else => null,
         };
@@ -472,7 +472,7 @@ pub const Tui = struct {
         };
     }
 
-    pub fn on_key(self: *Self, key: c_int, mods: c_int) void {
+    pub fn on_key(self: *Self, key: c_int, mods: c_int) !void {
         var arena = std.heap.ArenaAllocator.init(self.alloc);
         var alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
@@ -493,7 +493,7 @@ pub const Tui = struct {
             }
         } else if (get_encoded(key)) |enc| {
             if (mods == 0) {
-                str = enc;
+                str = try std.fmt.allocPrint(alloc, "<{}>", .{enc});
             } else {
                 std.debug.print("Cannot handle mods yet\n", .{});
             }
@@ -523,6 +523,8 @@ export fn key_cb(w: ?*c.GLFWwindow, key: c_int, scancode: c_int, action: c_int, 
     const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
     var tui = @ptrCast(*Tui, @alignCast(8, ptr));
     if (action == c.GLFW_PRESS or action == c.GLFW_REPEAT) {
-        tui.on_key(key, mods);
+        tui.on_key(key, mods) catch |err| {
+            std.debug.panic("Failed on_key: {}\n", .{err});
+        };
     }
 }

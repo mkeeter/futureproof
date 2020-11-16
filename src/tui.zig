@@ -291,49 +291,30 @@ pub const Tui = struct {
                 return false;
             }
 
+            const apis = [_][]const u8{
+                "grid_line",
+                "grid_scroll",
+                "flush",
+                "grid_clear",
+                "grid_cursor_goto",
+                "hl_attr_define",
+                "default_colors_set",
+                "mode_info_set",
+                "mode_change",
+            };
+
             for (event.Array[2].Array) |cmd| {
-                if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_line")) {
-                    for (cmd.Array[1..]) |v| {
-                        self.api_grid_line(v.Array);
+                inline for (apis) |api| {
+                    comptime const opts = std.builtin.CallOptions{};
+                    if (std.mem.eql(u8, cmd.Array[0].RawString, api)) {
+                        for (cmd.Array[1..]) |v| {
+                            @call(
+                                opts,
+                                @field(Self, "api_" ++ api),
+                                .{ self, v.Array },
+                            );
+                        }
                     }
-                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_scroll")) {
-                    for (cmd.Array[1..]) |v| {
-                        self.api_grid_scroll(v.Array);
-                    }
-                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "flush")) {
-                    for (cmd.Array[1..]) |v| {
-                        self.api_flush(v.Array);
-                    }
-                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_clear")) {
-                    for (cmd.Array[1..]) |v| {
-                        self.api_grid_clear(v.Array);
-                    }
-                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_cursor_goto")) {
-                    for (cmd.Array[1..]) |v| {
-                        self.api_grid_cursor_goto(v.Array);
-                    }
-                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "mouse_on")) {
-                    // Ignored, because UIs are allowed to always send mouse input
-                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "hl_attr_define")) {
-                    for (cmd.Array[1..]) |v| {
-                        self.api_hl_attr_define(v.Array);
-                    }
-                    uniforms_changed = true;
-                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "default_colors_set")) {
-                    for (cmd.Array[1..]) |v| {
-                        self.api_default_colors_set(v.Array);
-                    }
-                    uniforms_changed = true;
-                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "mode_info_set")) {
-                    for (cmd.Array[1..]) |v| {
-                        self.api_mode_info_set(v.Array);
-                    }
-                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "mode_change")) {
-                    for (cmd.Array[1..]) |v| {
-                        self.api_mode_change(v.Array);
-                    }
-                } else {
-                    std.debug.print("Unimplemented: {}\n", .{cmd.Array[0]});
                 }
             }
             try self.rpc.release_event(event);

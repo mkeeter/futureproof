@@ -197,13 +197,16 @@ pub const Tui = struct {
         }
     }
 
-    fn api_flush(self: *Self) void {
+    fn api_flush(self: *Self, cmd: []const msgpack.Value) void {
         // Send over the character grid, along with the extra two values
         // that mark cursor position within the grid
+        std.debug.assert(cmd.len == 0);
         self.renderer.update_grid(self.char_grid[0 .. self.total_tiles + 2]);
     }
 
-    fn api_grid_clear(self: *Self) void {
+    fn api_grid_clear(self: *Self, cmd: []const msgpack.Value) void {
+        const grid = cmd[0].UInt;
+        std.debug.assert(grid == 1);
         std.mem.set(u32, self.char_grid[0..], 0);
     }
 
@@ -299,11 +302,11 @@ pub const Tui = struct {
                     }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "flush")) {
                     for (cmd.Array[1..]) |v| {
-                        self.api_flush();
+                        self.api_flush(v.Array);
                     }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_clear")) {
                     for (cmd.Array[1..]) |v| {
-                        self.api_grid_clear();
+                        self.api_grid_clear(v.Array);
                     }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_cursor_goto")) {
                     for (cmd.Array[1..]) |v| {

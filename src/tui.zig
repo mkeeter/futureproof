@@ -29,6 +29,7 @@ pub const Tui = struct {
 
     //  Render state to pass into WGPU
     u: c.fpUniforms,
+    uniforms_changed: bool,
 
     pub fn deinit(self: *Tui) void {
         self.rpc.deinit();
@@ -84,6 +85,7 @@ pub const Tui = struct {
 
                 .attrs = undefined,
             },
+            .uniforms_changed = true,
         };
         window.set_callbacks(size_cb, key_cb, @ptrCast(?*c_void, out));
 
@@ -257,6 +259,7 @@ pub const Tui = struct {
     fn api_hl_attr_define(self: *Self, cmd: []const msgpack.Value) void {
         // Decode rgb_attrs into the appropriate slot
         self.u.attrs[cmd[0].UInt] = decode_hl_attrs(&cmd[1].Map);
+        self.uniforms_changed = true;
     }
 
     fn api_mode_info_set(self: *Self, cmd: []const msgpack.Value) void {
@@ -282,10 +285,10 @@ pub const Tui = struct {
             .special = @intCast(u32, cmd[2].UInt),
             .flags = 0,
         };
+        self.uniforms_changed = true;
     }
 
     pub fn tick(self: *Self) !bool {
-        var uniforms_changed = false;
         while (self.rpc.get_event()) |event| {
             if (event == .Int) {
                 return false;
@@ -320,7 +323,8 @@ pub const Tui = struct {
             try self.rpc.release_event(event);
         }
 
-        if (uniforms_changed) {
+        if (self.uniforms_changed) {
+            self.uniforms_changed = false;
             self.renderer.update_uniforms(&self.u);
         }
         self.renderer.redraw(self.total_tiles);

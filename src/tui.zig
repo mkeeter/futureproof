@@ -258,14 +258,18 @@ pub const Tui = struct {
 
     fn api_mode_info_set(self: *Self, cmd: []const msgpack.Value) void {
         const cursor_style_enabled = cmd[0].Boolean;
-        std.debug.print("api_mode_info_set: {}\n", .{cursor_style_enabled});
+        std.debug.print("api_mode_info_set: {}", .{cursor_style_enabled});
         for (cmd[1].Array) |arr| {
             var itr = arr.Map.iterator();
             std.debug.print("\n", .{});
             while (itr.next()) |entry| {
-                std.debug.print("   {}\t{}\n", .{ entry.value, entry.key });
+                std.debug.print("   {}\t{}\n", .{ entry.key, entry.value });
             }
         }
+    }
+
+    fn api_mode_change(self: *Self, cmd: []const msgpack.Value) void {
+        std.debug.print("Mode change: {}, {}\n", .{ cmd[0].RawString, cmd[1].UInt });
     }
 
     fn api_default_colors_set(self: *Self, cmd: []const msgpack.Value) void {
@@ -294,9 +298,13 @@ pub const Tui = struct {
                         self.api_grid_scroll(v.Array);
                     }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "flush")) {
-                    self.api_flush();
+                    for (cmd.Array[1..]) |v| {
+                        self.api_flush();
+                    }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_clear")) {
-                    self.api_grid_clear();
+                    for (cmd.Array[1..]) |v| {
+                        self.api_grid_clear();
+                    }
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "grid_cursor_goto")) {
                     for (cmd.Array[1..]) |v| {
                         self.api_grid_cursor_goto(v.Array);
@@ -316,6 +324,10 @@ pub const Tui = struct {
                 } else if (std.mem.eql(u8, cmd.Array[0].RawString, "mode_info_set")) {
                     for (cmd.Array[1..]) |v| {
                         self.api_mode_info_set(v.Array);
+                    }
+                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "mode_change")) {
+                    for (cmd.Array[1..]) |v| {
+                        self.api_mode_change(v.Array);
                     }
                 } else {
                     std.debug.print("Unimplemented: {}\n", .{cmd.Array[0]});

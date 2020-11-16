@@ -30,11 +30,29 @@ struct fpHlAttrs {
     uint32_t foreground;
     uint32_t background;
     uint32_t special;
-    uint32_t flags;
+    uint32_t flags; // Set of FP_FLAGs above
 };
+#define FP_CURSOR_BLOCK 0
+#define FP_CURSOR_VERTICAL 1
+#define FP_CURSOR_HORIZONTAL 2
+struct fpMode {
+    uint32_t cursor_shape; // One of the FP_CURSORs above
+    uint32_t cell_percentage;
+
+    uint32_t blinkwait;
+    uint32_t blinkon;
+    uint32_t blinkoff;
+
+    uint32_t attr_id;
+    uint32_t attr_id_lm;
+};
+
+#define FP_MAX_MODES 32
+#define FP_MAX_ATTRS 256
 struct fpUniforms {
     uint32_t width_px;
     uint32_t height_px;
     MEMBER_STRUCT fpAtlasUniforms font;
-    MEMBER_STRUCT fpHlAttrs attrs[256];
+    MEMBER_STRUCT fpHlAttrs attrs[FP_MAX_ATTRS];
+    MEMBER_STRUCT fpMode modes[FP_MAX_MODES];
 };

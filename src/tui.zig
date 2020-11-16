@@ -84,6 +84,7 @@ pub const Tui = struct {
                 .font = font.u,
 
                 .attrs = undefined,
+                .modes = undefined,
             },
             .uniforms_changed = true,
         };
@@ -258,13 +259,16 @@ pub const Tui = struct {
 
     fn api_hl_attr_define(self: *Self, cmd: []const msgpack.Value) void {
         // Decode rgb_attrs into the appropriate slot
-        self.u.attrs[cmd[0].UInt] = decode_hl_attrs(&cmd[1].Map);
+        const id = cmd[0].UInt;
+        std.debug.assert(id < c.FP_MAX_ATTRS);
+        self.u.attrs[id] = decode_hl_attrs(&cmd[1].Map);
         self.uniforms_changed = true;
     }
 
     fn api_mode_info_set(self: *Self, cmd: []const msgpack.Value) void {
         const cursor_style_enabled = cmd[0].Boolean;
-        std.debug.print("api_mode_info_set: {}", .{cursor_style_enabled});
+        std.debug.print("api_mode_info_set: {} {}", .{ cursor_style_enabled, cmd[1].Array.len });
+        std.debug.assert(cmd[1].Array.len < c.FP_MAX_MODES);
         for (cmd[1].Array) |arr| {
             var itr = arr.Map.iterator();
             std.debug.print("\n", .{});

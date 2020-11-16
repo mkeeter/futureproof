@@ -256,6 +256,18 @@ pub const Tui = struct {
         self.u.attrs[cmd[0].UInt] = decode_hl_attrs(&cmd[1].Map);
     }
 
+    fn api_mode_info_set(self: *Self, cmd: []const msgpack.Value) void {
+        const cursor_style_enabled = cmd[0].Boolean;
+        std.debug.print("api_mode_info_set: {}\n", .{cursor_style_enabled});
+        for (cmd[1].Array) |arr| {
+            var itr = arr.Map.iterator();
+            std.debug.print("\n", .{});
+            while (itr.next()) |entry| {
+                std.debug.print("   {}\t{}\n", .{ entry.value, entry.key });
+            }
+        }
+    }
+
     fn api_default_colors_set(self: *Self, cmd: []const msgpack.Value) void {
         self.u.attrs[0] = (c.fpHlAttrs){
             .foreground = @intCast(u32, cmd[0].UInt),
@@ -301,6 +313,10 @@ pub const Tui = struct {
                         self.api_default_colors_set(v.Array);
                     }
                     uniforms_changed = true;
+                } else if (std.mem.eql(u8, cmd.Array[0].RawString, "mode_info_set")) {
+                    for (cmd.Array[1..]) |v| {
+                        self.api_mode_info_set(v.Array);
+                    }
                 } else {
                     std.debug.print("Unimplemented: {}\n", .{cmd.Array[0]});
                 }

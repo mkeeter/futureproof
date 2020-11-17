@@ -61,6 +61,12 @@ void main() {
                 out_color = vec4(pow(color, vec3(1/2.2)), 1.0);
                 return;
             }
+        } else if (mode.cursor_shape == FP_CURSOR_HORIZONTAL) {
+            if (v_cell_coords.y * 100 <= mode.cell_percentage) {
+                vec3 color = cursor_fg;
+                out_color = vec4(pow(color, vec3(1/2.2)), 1.0);
+                return;
+            }
         }
     }
 

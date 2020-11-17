@@ -83,6 +83,6 @@ void main() {
         // Gamma correction
         out_color = vec4(pow(color, vec3(1/2.2)), 1.0);
     } else {
-        out_color = vec4(bg, 1.0);
+        out_color = vec4(pow(bg, vec3(1/2.2)), 1.0);
     }
 }

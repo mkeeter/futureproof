@@ -201,10 +201,10 @@ pub const Tui = struct {
     }
 
     fn api_flush(self: *Self, cmd: []const msgpack.Value) void {
-        // Send over the character grid, along with the extra two values
-        // that mark cursor position within the grid
+        // Send over the character grid, along with the extra three values
+        // that mark cursor position and mode within the grid
         std.debug.assert(cmd.len == 0);
-        self.renderer.update_grid(self.char_grid[0 .. self.total_tiles + 2]);
+        self.renderer.update_grid(self.char_grid[0 .. self.total_tiles + 3]);
     }
 
     fn api_grid_clear(self: *Self, cmd: []const msgpack.Value) void {
@@ -265,21 +265,55 @@ pub const Tui = struct {
         self.uniforms_changed = true;
     }
 
-    fn api_mode_info_set(self: *Self, cmd: []const msgpack.Value) void {
-        const cursor_style_enabled = cmd[0].Boolean;
-        std.debug.print("api_mode_info_set: {} {}", .{ cursor_style_enabled, cmd[1].Array.len });
-        std.debug.assert(cmd[1].Array.len < c.FP_MAX_MODES);
-        for (cmd[1].Array) |arr| {
-            var itr = arr.Map.iterator();
-            std.debug.print("\n", .{});
-            while (itr.next()) |entry| {
-                std.debug.print("   {}\t{}\n", .{ entry.key, entry.value });
+    fn decode_mode(mode: *const msgpack.KeyValueMap) c.fpMode {
+        var out = (c.fpMode){
+            .cursor_shape = c.FP_CURSOR_BLOCK,
+            .cell_percentage = 100,
+            .blinkwait = 0,
+            .blinkon = 0,
+            .blinkoff = 0,
+            .attr_id = 0,
+        };
+        var itr = mode.iterator();
+        while (itr.next()) |entry| {
+            if (std.mem.eql(u8, entry.key.RawString, "cursor_shape")) {
+                if (std.mem.eql(u8, entry.value.RawString, "horizontal")) {
+                    out.cursor_shape = c.FP_CURSOR_HORIZONTAL;
+                } else if (std.mem.eql(u8, entry.value.RawString, "vertical")) {
+                    out.cursor_shape = c.FP_CURSOR_VERTICAL;
+                } else if (std.mem.eql(u8, entry.value.RawString, "block")) {
+                    out.cursor_shape = c.FP_CURSOR_BLOCK;
+                } else {
+                    std.debug.panic("Unknown cursor shape: {}\n", .{entry.value});
+                }
+            } else if (std.mem.eql(u8, entry.key.RawString, "cell_percentage")) {
+                out.cell_percentage = @intCast(u32, entry.value.UInt);
+            } else if (std.mem.eql(u8, entry.key.RawString, "blinkwait")) {
+                out.blinkwait = @intCast(u32, entry.value.UInt);
+            } else if (std.mem.eql(u8, entry.key.RawString, "blinkon")) {
+                out.blinkon = @intCast(u32, entry.value.UInt);
+            } else if (std.mem.eql(u8, entry.key.RawString, "blinkoff")) {
+                out.blinkoff = @intCast(u32, entry.value.UInt);
+            } else if (std.mem.eql(u8, entry.key.RawString, "attr_id")) {
+                out.attr_id = @intCast(u32, entry.value.UInt);
+            } else {
+                // Ignore other elements for now
             }
+        }
+        return out;
+    }
+
+    fn api_mode_info_set(self: *Self, cmd: []const msgpack.Value) void {
+        const cursor_style_enabled = cmd[0].Boolean; // unused for now?
+        std.debug.assert(cmd[1].Array.len < c.FP_MAX_MODES);
+        var i: u32 = 0;
+        while (i < cmd[1].Array.len) : (i += 1) {
+            self.u.modes[i] = decode_mode(&cmd[1].Array[i].Map);
         }
     }
 
     fn api_mode_change(self: *Self, cmd: []const msgpack.Value) void {
-        std.debug.print("Mode change: {}, {}\n", .{ cmd[0].RawString, cmd[1].UInt });
+        self.char_grid[self.total_tiles + 2] = @intCast(u32, cmd[1].UInt);
     }
 
     fn api_default_colors_set(self: *Self, cmd: []const msgpack.Value) void {

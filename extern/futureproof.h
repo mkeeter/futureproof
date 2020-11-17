@@ -44,7 +44,6 @@ struct fpMode {
     uint32_t blinkoff;
 
     uint32_t attr_id;
-    uint32_t attr_id_lm;
 };
 
 #define FP_MAX_MODES 32

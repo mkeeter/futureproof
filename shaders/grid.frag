@@ -3,10 +3,11 @@
 #extension GL_EXT_scalar_block_layout : require
 #include "extern/futureproof.h"
 
-layout(location=0) in  vec2 v_tex_coords;
-layout(location=1) in flat uint v_ascii;
-layout(location=2) in flat uint v_hl_attr;
-layout(location=3) in flat uint v_cursor;
+layout(location=0) in vec2 v_tex_coords;
+layout(location=1) in vec2 v_cell_coords;
+layout(location=2) in flat uint v_ascii;
+layout(location=3) in flat uint v_hl_attr;
+layout(location=4) in flat  int v_cursor;
 
 layout(location=0) out vec4 out_color;
 
@@ -36,10 +37,35 @@ void main() {
         bg = tmp;
     }
 
-    if (v_cursor != 0) {
-        out_color = vec4(1.0, 1.0, 1.0, 1.0);
-    } else if (v_tex_coords.x >= 0 && v_tex_coords.x < glyph.width &&
-               v_tex_coords.y > 0 && v_tex_coords.y <= glyph.height)
+    if (v_cursor != -1) {
+        fpMode mode = u.modes[v_cursor];
+        fpHlAttrs attrs = u.attrs[mode.attr_id];
+
+        // Calculate cursor colors
+        vec3 cursor_fg, cursor_bg;
+        if (mode.attr_id == 0) {
+            cursor_fg = to_vec3(u.attrs[0].foreground);
+            cursor_bg = to_vec3(u.attrs[0].background);
+        } else {
+            cursor_fg = to_vec3(attrs.foreground == 0xFFFFFFFF ? u.attrs[0].foreground : attrs.foreground);
+            cursor_bg = to_vec3(attrs.background == 0xFFFFFFFF ? u.attrs[0].background : attrs.background);
+        }
+
+        // The BLOCK cursor simply modifies the usual fg / bg values
+        if (mode.cursor_shape == FP_CURSOR_BLOCK) {
+            fg = cursor_bg;
+            bg = cursor_fg;
+        } else if (mode.cursor_shape == FP_CURSOR_VERTICAL) {
+            if (v_cell_coords.x * 100 <= mode.cell_percentage) {
+                vec3 color = cursor_fg;
+                out_color = vec4(pow(color, vec3(1/2.2)), 1.0);
+                return;
+            }
+        }
+    }
+
+    if (v_tex_coords.x >= 0 && v_tex_coords.x < glyph.width &&
+        v_tex_coords.y > 0 && v_tex_coords.y <= glyph.height)
     {
         ivec2 i = ivec2(glyph.x0 + v_tex_coords.x,
                         glyph.y0 + glyph.height - v_tex_coords.y);

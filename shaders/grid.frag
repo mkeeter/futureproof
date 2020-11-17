@@ -18,9 +18,9 @@ layout(set=0, binding=2, std430) uniform Uniforms {
 };
 
 vec3 to_vec3(uint u) {
-    return vec3(((u >> 0)  & 0xFF) / 255.0,
+    return vec3(((u >> 16) & 0xFF) / 255.0,
                 ((u >> 8)  & 0xFF) / 255.0,
-                ((u >> 16) & 0xFF) / 255.0);
+                ((u >> 0)  & 0xFF) / 255.0);
 }
 
 mat3 get_colors(uint attr_id) {

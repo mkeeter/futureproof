@@ -23,6 +23,14 @@ vec3 to_vec3(uint u) {
                 ((u >> 16) & 0xFF) / 255.0);
 }
 
+mat3 get_colors(uint attr_id) {
+    fpHlAttrs attrs = u.attrs[attr_id];
+    vec3 fg = to_vec3(attrs.foreground == 0xFFFFFFFF ? u.attrs[0].foreground : attrs.foreground);
+    vec3 bg = to_vec3(attrs.background == 0xFFFFFFFF ? u.attrs[0].background : attrs.background);
+    vec3 sp = to_vec3(attrs.special == 0xFFFFFFFF ? u.attrs[0].special : attrs.special);
+    return mat3(fg, bg, sp);
+}
+
 void main() {
     fpGlyph glyph = u.font.glyphs[v_ascii];
     fpHlAttrs attrs = u.attrs[v_hl_attr];

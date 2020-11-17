@@ -64,14 +64,42 @@ void main() {
             fg = cursor_bg;
             bg = cursor_fg;
         } else if (mode.cursor_shape == FP_CURSOR_VERTICAL) {
-            if (v_cell_coords.x * 100 <= mode.cell_percentage) {
-                vec3 color = cursor_fg;
+            const float fade = 1.0 / u.font.glyph_advance;
+            float p = mode.cell_percentage / 100.0;
+            float t = -1.0;
+            if (v_cell_coords.x < fade) {
+                t = v_cell_coords.x / fade;
+            } else if (v_cell_coords.x < p - fade) {
+                t = 1.0;
+            } else if (v_cell_coords.x < p) {
+                t = 1.0 - (v_cell_coords.x - p + fade) / fade;
+            }
+
+            if (t != -1.0) {
+                // Blending foreground and background
+                vec3 color = t * cursor_fg + (1.0 - t) * cursor_bg;
+
+                // Gamma correction
                 out_color = vec4(pow(color, vec3(1/2.2)), 1.0);
                 return;
             }
         } else if (mode.cursor_shape == FP_CURSOR_HORIZONTAL) {
-            if (v_cell_coords.y * 100 <= mode.cell_percentage) {
-                vec3 color = cursor_fg;
+            const float fade = 1.0 / u.font.glyph_height;
+            float p = mode.cell_percentage / 100.0;
+            float t = -1.0;
+            if (v_cell_coords.y < fade) {
+                t = v_cell_coords.y / fade;
+            } else if (v_cell_coords.y < p - fade) {
+                t = 1.0;
+            } else if (v_cell_coords.y < p) {
+                t = 1.0 - (v_cell_coords.y - p + fade) / fade;
+            }
+
+            if (t != -1.0) {
+                // Blending foreground and background
+                vec3 color = t * cursor_fg + (1.0 - t) * cursor_bg;
+
+                // Gamma correction
                 out_color = vec4(pow(color, vec3(1/2.2)), 1.0);
                 return;
             }

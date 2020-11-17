@@ -70,19 +70,18 @@ void main() {
         }
     }
 
+    vec3 t = vec3(0);
     if (v_tex_coords.x >= 0 && v_tex_coords.x < glyph.width &&
         v_tex_coords.y > 0 && v_tex_coords.y <= glyph.height)
     {
         ivec2 i = ivec2(glyph.x0 + v_tex_coords.x,
                         glyph.y0 + glyph.height - v_tex_coords.y);
-        vec3 t = texelFetch(sampler2D(font_tex, font_sampler), i, 0).rgb;
-
-        // Blending foreground and background
-        vec3 color = t * fg + (1.0 - t) * bg;
-
-        // Gamma correction
-        out_color = vec4(pow(color, vec3(1/2.2)), 1.0);
-    } else {
-        out_color = vec4(pow(bg, vec3(1/2.2)), 1.0);
+        t = texelFetch(sampler2D(font_tex, font_sampler), i, 0).rgb;
     }
+
+    // Blending foreground and background
+    vec3 color = t * fg + (1.0 - t) * bg;
+
+    // Gamma correction
+    out_color = vec4(pow(color, vec3(1/2.2)), 1.0);
 }

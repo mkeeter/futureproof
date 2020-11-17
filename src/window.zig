@@ -24,6 +24,12 @@ pub const Window = struct {
         return c.glfwWindowShouldClose(self.window) != 0;
     }
 
+    pub fn get_window_width(self: *Self) u32 {
+        var w_width: c_int = undefined;
+        c.glfwGetWindowSize(self.window, &w_width, null);
+        return @intCast(u32, w_width);
+    }
+
     pub fn set_callbacks(
         self: *Self,
         size_cb: c.GLFWframebuffersizefun,

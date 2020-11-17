@@ -31,6 +31,8 @@ pub const Tui = struct {
     u: c.fpUniforms,
     uniforms_changed: bool,
 
+    pixel_density: u32,
+
     pub fn deinit(self: *Tui) void {
         self.rpc.deinit();
         self.font.deinit();
@@ -52,7 +54,7 @@ pub const Tui = struct {
         const font = try ft.build_atlas(
             alloc,
             "font/Inconsolata-Regular.ttf",
-            28,
+            14,
             512,
         );
         const renderer = try Renderer.init(tmp_alloc, window.window, &font);
@@ -87,6 +89,7 @@ pub const Tui = struct {
                 .modes = undefined,
             },
             .uniforms_changed = true,
+            .pixel_density = 1,
         };
         window.set_callbacks(size_cb, key_cb, @ptrCast(?*c_void, out));
 
@@ -381,6 +384,23 @@ pub const Tui = struct {
     pub fn update_size(self: *Self, width: c_int, height: c_int) void {
         self.u.width_px = @intCast(u32, width);
         self.u.height_px = @intCast(u32, height);
+
+        const density = self.u.width_px / self.window.get_window_width();
+        if (density != self.pixel_density) {
+            self.pixel_density = density;
+
+            self.font.deinit();
+            self.font = ft.build_atlas(
+                self.alloc,
+                "font/Inconsolata-Regular.ttf",
+                14 * self.pixel_density,
+                512,
+            ) catch |err| {
+                std.debug.panic("Could not rebuild font: {}\n", .{err});
+            };
+            self.u.font = self.font.u;
+            self.renderer.update_font_tex(&self.font);
+        }
 
         const cursor_x = self.char_grid[self.total_tiles];
         const cursor_y = self.char_grid[self.total_tiles + 1];

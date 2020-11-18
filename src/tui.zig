@@ -8,6 +8,8 @@ const Renderer = @import("renderer.zig").Renderer;
 const RPC = @import("rpc.zig").RPC;
 const Window = @import("window.zig").Window;
 
+const FONT_NAME = "font/Inconsolata-Regular.ttf";
+
 pub const Tui = struct {
     const Self = @This();
 
@@ -53,7 +55,7 @@ pub const Tui = struct {
 
         const font = try ft.build_atlas(
             alloc,
-            "font/Inconsolata-Regular.ttf",
+            FONT_NAME,
             14,
             512,
         );
@@ -392,7 +394,7 @@ pub const Tui = struct {
             self.font.deinit();
             self.font = ft.build_atlas(
                 self.alloc,
-                "font/Inconsolata-Regular.ttf",
+                FONT_NAME,
                 14 * self.pixel_density,
                 512,
             ) catch |err| {

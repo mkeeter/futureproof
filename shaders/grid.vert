@@ -16,15 +16,19 @@ layout(location=2) out flat uint v_ascii;
 layout(location=3) out flat uint v_hl_attr;
 layout(location=4) out flat  int v_cursor;
 
-// Hard-coded triangle layout
-const ivec2 positions[6] = ivec2[6](
-    ivec2(0, 0),
-    ivec2(1, 0),
-    ivec2(0, 1),
-    ivec2(1, 0),
-    ivec2(0, 1),
-    ivec2(1, 1)
-);
+// Use a switch statement instead of a const array to work around
+// https://github.com/gfx-rs/wgpu-native/issues/53
+ivec2 vertex_position(uint i) {
+    // Hard-coded triangle layout
+    switch (i % 6) {
+        case 0: return ivec2(0, 0);
+        case 1: return ivec2(1, 0);
+        case 2: return ivec2(0, 1);
+        case 3: return ivec2(1, 0);
+        case 4: return ivec2(0, 1);
+        case 5: return ivec2(1, 1);
+    };
+}
 
 void main() {
     uint tile_id = gl_VertexIndex / 6;
@@ -43,7 +47,7 @@ void main() {
     // Tile position (0 to x_tiles, 0 to y_tiles)
     ivec2 tile = ivec2(tile_id % x_tiles, y_tiles - 1 - (tile_id / x_tiles));
 
-    ivec2 p = positions[gl_VertexIndex % 6];
+    ivec2 p = vertex_position(gl_VertexIndex);
 
     // Position of the tile vertex within the tile
     ivec2 tile_pos_px = (tile + p) * ivec2(u.font.glyph_advance, u.font.glyph_height);

@@ -66,7 +66,7 @@ pub const Renderer = struct {
         // WGPU initial setup
         var adapter: c.WGPUAdapterId = 0;
         c.wgpu_request_adapter_async(&(c.WGPURequestAdapterOptions){
-            .power_preference = @intToEnum(c.WGPUPowerPreference, c.WGPUPowerPreference_HighPerformance),
+            .power_preference = @intToEnum(c.WGPUPowerPreference, c.WGPUPowerPreference_LowPower),
             .compatible_surface = surface,
         }, 2 | 4 | 8, false, adapter_cb, &adapter);
 

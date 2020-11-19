@@ -266,6 +266,8 @@ pub const Tui = struct {
                 out.flags |= c.FP_FLAG_UNDERLINE;
             } else if (std.mem.eql(u8, entry.key.RawString, "strikethrough") and entry.value.Boolean) {
                 out.flags |= c.FP_FLAG_STRIKETHROUGH;
+            } else if (std.mem.eql(u8, entry.key.RawString, "standout") and entry.value.Boolean) {
+                out.flags |= c.FP_FLAG_STANDOUT;
             } else {
                 std.debug.warn("Unknown hlAttr: {} {}\n", .{ entry.key, entry.value });
             }

@@ -81,7 +81,7 @@ void main() {
     float t1x = t0x + dtx;
 
     float dy = u.font.glyph_height;
-    float y1 = glyph.y_offset;
+    float y1 = glyph.y_offset - 1;
     float y2 = y1 + glyph.height;
     float vy = glyph.height;
     float t0y = vy * y1 / (y1 - y2);

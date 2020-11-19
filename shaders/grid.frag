@@ -17,17 +17,24 @@ layout(set=0, binding=2, std430) uniform Uniforms {
     fpUniforms u;
 };
 
+const vec3 GAMMA = vec3(1/2.2);
+
 vec3 to_vec3(uint u) {
     return vec3(((u >> 16) & 0xFF) / 255.0,
                 ((u >> 8)  & 0xFF) / 255.0,
                 ((u >> 0)  & 0xFF) / 255.0);
 }
 
-mat3 get_colors(uint attr_id) {
+vec3 to_vec3_linear(uint u) {
+    return pow(to_vec3(u), 1/GAMMA);
+}
+
+mat3 get_colors_linear(uint attr_id) {
     fpHlAttrs attrs = u.attrs[attr_id];
-    vec3 fg = to_vec3(attrs.foreground == 0xFFFFFFFF ? u.attrs[0].foreground : attrs.foreground);
-    vec3 bg = to_vec3(attrs.background == 0xFFFFFFFF ? u.attrs[0].background : attrs.background);
-    vec3 sp = to_vec3(attrs.special == 0xFFFFFFFF ? u.attrs[0].special : attrs.special);
+#define GET(NAME) (attrs.NAME == 0xFFFFFFFF ? u.attrs[0].NAME : attrs.NAME)
+    vec3 fg = to_vec3_linear(GET(foreground));
+    vec3 bg = to_vec3_linear(GET(background));
+    vec3 sp = to_vec3_linear(GET(special));
     return mat3(fg, bg, sp);
 }
 
@@ -35,34 +42,24 @@ void main() {
     fpGlyph glyph = u.font.glyphs[v_ascii];
     fpHlAttrs attrs = u.attrs[v_hl_attr];
 
-    vec3 fg = to_vec3(attrs.foreground == 0xFFFFFFFF ? u.attrs[0].foreground : attrs.foreground);
-    vec3 bg = to_vec3(attrs.background == 0xFFFFFFFF ? u.attrs[0].background : attrs.background);
-    vec3 sp = to_vec3(attrs.special == 0xFFFFFFFF ? u.attrs[0].special : attrs.special);
+    mat3 colors = get_colors_linear(v_hl_attr);
 
-    if ((attrs.flags & FP_FLAG_REVERSE) != 0) {
-        vec3 tmp = fg;
-        fg = bg;
-        bg = tmp;
+    if ((attrs.flags & (FP_FLAG_REVERSE | FP_FLAG_STANDOUT)) != 0) {
+        // Swap foreground and background (rows 0 and 1 respectively)
+        colors = colors * mat3(0, 1, 0, 1, 0, 0, 0, 0, 1);
     }
 
     if (v_cursor != -1) {
         fpMode mode = u.modes[v_cursor];
         fpHlAttrs attrs = u.attrs[mode.attr_id];
 
-        // Calculate cursor colors
-        vec3 cursor_fg, cursor_bg;
-        if (mode.attr_id == 0) {
-            cursor_fg = to_vec3(u.attrs[0].foreground);
-            cursor_bg = to_vec3(u.attrs[0].background);
-        } else {
-            cursor_fg = to_vec3(attrs.foreground == 0xFFFFFFFF ? u.attrs[0].foreground : attrs.foreground);
-            cursor_bg = to_vec3(attrs.background == 0xFFFFFFFF ? u.attrs[0].background : attrs.background);
-        }
+        // Get cursor colors
+        mat3 cursor_colors = get_colors_linear(mode.attr_id);
 
         // The BLOCK cursor simply modifies the usual fg / bg values
         if (mode.cursor_shape == FP_CURSOR_BLOCK) {
-            fg = cursor_bg;
-            bg = cursor_fg;
+            colors[0] = cursor_colors[1];
+            colors[1] = cursor_colors[0];
         } else if (mode.cursor_shape == FP_CURSOR_VERTICAL) {
             const float fade = 1.0 / u.font.glyph_advance;
             float p = mode.cell_percentage / 100.0;
@@ -77,10 +74,10 @@ void main() {
 
             if (t != -1.0) {
                 // Blending foreground and background
-                vec3 color = t * cursor_fg + (1.0 - t) * cursor_bg;
+                vec3 color = t * cursor_colors[0] + (1.0 - t) * cursor_colors[1];
 
                 // Gamma correction
-                out_color = vec4(pow(color, vec3(1/2.2)), 1.0);
+                out_color = vec4(pow(color, GAMMA), 1.0);
                 return;
             }
         } else if (mode.cursor_shape == FP_CURSOR_HORIZONTAL) {
@@ -97,10 +94,10 @@ void main() {
 
             if (t != -1.0) {
                 // Blending foreground and background
-                vec3 color = t * cursor_fg + (1.0 - t) * cursor_bg;
+                vec3 color = t * cursor_colors[0] + (1.0 - t) * cursor_colors[1];
 
                 // Gamma correction
-                out_color = vec4(pow(color, vec3(1/2.2)), 1.0);
+                out_color = vec4(pow(color, GAMMA), 1.0);
                 return;
             }
         }
@@ -116,8 +113,8 @@ void main() {
     }
 
     // Blending foreground and background
-    vec3 color = t * fg + (1.0 - t) * bg;
+    vec3 color = t * colors[0] + (1.0 - t) * colors[1];
 
     // Gamma correction
-    out_color = vec4(pow(color, vec3(1/2.2)), 1.0);
+    out_color = vec4(pow(color, GAMMA), 1.0);
 }

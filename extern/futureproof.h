@@ -25,6 +25,7 @@ struct fpAtlasUniforms {
 #define FP_FLAG_UNDERCURL     (1 << 3)
 #define FP_FLAG_UNDERLINE     (1 << 4)
 #define FP_FLAG_STRIKETHROUGH (1 << 5)
+#define FP_FLAG_STANDOUT      (1 << 6)
 
 struct fpHlAttrs {
     uint32_t foreground;

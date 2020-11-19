@@ -8,7 +8,8 @@ const Renderer = @import("renderer.zig").Renderer;
 const RPC = @import("rpc.zig").RPC;
 const Window = @import("window.zig").Window;
 
-const FONT_NAME = "font/Inconsolata-Regular.ttf";
+const FONT_NAME = "font/Inconsolata-SemiBold.ttf";
+const FONT_SIZE = 16;
 
 pub const Tui = struct {
     const Self = @This();
@@ -56,7 +57,7 @@ pub const Tui = struct {
         const font = try ft.build_atlas(
             alloc,
             FONT_NAME,
-            14,
+            FONT_SIZE,
             512,
         );
         const renderer = try Renderer.init(tmp_alloc, window.window, &font);
@@ -65,8 +66,18 @@ pub const Tui = struct {
         const y_tiles = @intCast(u32, height) / font.u.glyph_height;
 
         // Start up the RPC subprocess, using the global allocator
-        const nvim_cmd = [_][]const u8{ "nvim", "--embed" };
-        var rpc = try RPC.init(&nvim_cmd, alloc);
+        const nvim_cmd = [_][]const u8{
+            "nvim",
+            "--embed",
+            "--clean",
+            "-u",
+            "config/init.vim",
+        };
+        var env_map = std.BufMap.init(alloc);
+        defer env_map.deinit();
+        try env_map.set("VIMRUNTIME", "config");
+        try env_map.set("SHELL", "/usr/bin/env bash");
+        var rpc = try RPC.init(&nvim_cmd, alloc, &env_map);
 
         const out = try alloc.create(Tui);
         out.* = Tui{
@@ -395,7 +406,7 @@ pub const Tui = struct {
             self.font = ft.build_atlas(
                 self.alloc,
                 FONT_NAME,
-                14 * self.pixel_density,
+                FONT_SIZE * self.pixel_density,
                 512,
             ) catch |err| {
                 std.debug.panic("Could not rebuild font: {}\n", .{err});

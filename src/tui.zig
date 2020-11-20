@@ -144,7 +144,7 @@ pub const Tui = struct {
         while (y != y_final) : (y += dy) {
             var x = left;
             const y_src = @intCast(u32, y);
-            const y_dst = @intCast(u32, y - rows);
+            const y_dst = @intCast(u32, if (y >= rows) y - rows else 0);
             while (x < right) : (x += 1) {
                 self.char_at(x, y_dst).* = self.char_at(x, y_src).*;
             }

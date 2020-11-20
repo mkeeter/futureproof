@@ -130,26 +130,32 @@ pub const Tui = struct {
         std.debug.assert(grid == 1);
 
         // Welcome to the obnoxious math zone
-        const top = @intCast(i32, line[1].UInt);
-        const bot = @intCast(i32, line[2].UInt);
+        const top = line[1].UInt;
+        const bot = line[2].UInt;
         const left = line[3].UInt;
         const right = line[4].UInt;
-        const rows = @intCast(i32, line[5].UInt);
+
         const cols = line[6].UInt;
         std.debug.assert(cols == 0);
 
-        var y: i32 = if (rows > 0) (bot - rows) else (top + rows - 1);
-        var dy: i32 = if (rows > 0) 1 else -1;
-        var y_final: i32 = if (rows > 0) bot else (top - 1);
-        while (y != y_final) : (y += dy) {
-            if (y < rows) {
-                continue;
+        if (line[5] == .UInt) {
+            const rows = line[5].UInt;
+            var y = top;
+            while (y < top + rows) : (y += 1) {
+                var x = left;
+                while (x < right) : (x += 1) {
+                    self.char_at(x, y).* = self.char_at(x, y + rows).*;
+                }
             }
-            var x = left;
-            const y_src = @intCast(u32, y);
-            const y_dst = @intCast(u32, y - rows);
-            while (x < right) : (x += 1) {
-                self.char_at(x, y_dst).* = self.char_at(x, y_src).*;
+        } else if (line[5] == .Int) {
+            const rows = @intCast(u32, -line[5].Int);
+            std.debug.print("top: {} bot: {} left: {} right: {}, rows: {}, cols: {}\n", .{ top, bot, left, right, rows, cols });
+            var y = bot - 1;
+            while (y >= top + rows) : (y -= 1) {
+                var x = left;
+                while (x < right) : (x += 1) {
+                    self.char_at(x, y - rows).* = self.char_at(x, y).*;
+                }
             }
         }
     }

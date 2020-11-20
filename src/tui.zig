@@ -149,12 +149,11 @@ pub const Tui = struct {
             }
         } else if (line[5] == .Int) {
             const rows = @intCast(u32, -line[5].Int);
-            std.debug.print("top: {} bot: {} left: {} right: {}, rows: {}, cols: {}\n", .{ top, bot, left, right, rows, cols });
             var y = bot - 1;
             while (y >= top + rows) : (y -= 1) {
                 var x = left;
                 while (x < right) : (x += 1) {
-                    self.char_at(x, y - rows).* = self.char_at(x, y).*;
+                    self.char_at(x, y).* = self.char_at(x, y - rows).*;
                 }
             }
         }

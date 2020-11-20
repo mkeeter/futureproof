@@ -142,9 +142,12 @@ pub const Tui = struct {
         var dy: i32 = if (rows > 0) 1 else -1;
         var y_final: i32 = if (rows > 0) bot else (top - 1);
         while (y != y_final) : (y += dy) {
+            if (y < rows) {
+                continue;
+            }
             var x = left;
             const y_src = @intCast(u32, y);
-            const y_dst = @intCast(u32, if (y >= rows) y - rows else 0);
+            const y_dst = @intCast(u32, y - rows);
             while (x < right) : (x += 1) {
                 self.char_at(x, y_dst).* = self.char_at(x, y_src).*;
             }

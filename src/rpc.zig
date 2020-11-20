@@ -52,15 +52,10 @@ pub const RPC = struct {
     alloc: *std.mem.Allocator,
     msgid: u32,
 
-    pub fn init(
-        argv: []const []const u8,
-        alloc: *std.mem.Allocator,
-        env_map: ?*const std.BufMap,
-    ) !RPC {
+    pub fn init(argv: []const []const u8, alloc: *std.mem.Allocator) !RPC {
         const child = try std.ChildProcess.init(argv, alloc);
         child.stdin_behavior = .Pipe;
         child.stdout_behavior = .Pipe;
-        child.env_map = env_map;
         try child.spawn();
 
         const out = (child.stdin orelse std.debug.panic("Could not get stdout", .{})).writer();

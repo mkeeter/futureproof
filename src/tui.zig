@@ -73,10 +73,7 @@ pub const Tui = struct {
             "-u",
             "config/init.vim",
         };
-        var env_map = std.BufMap.init(alloc);
-        defer env_map.deinit();
-        try env_map.set("SHELL", "/usr/bin/env bash");
-        var rpc = try RPC.init(&nvim_cmd, alloc, &env_map);
+        var rpc = try RPC.init(&nvim_cmd, alloc);
 
         const out = try alloc.create(Tui);
         out.* = Tui{

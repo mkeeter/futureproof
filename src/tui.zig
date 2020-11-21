@@ -100,7 +100,7 @@ pub const Tui = struct {
             .uniforms_changed = true,
             .pixel_density = 1,
         };
-        window.set_callbacks(size_cb, key_cb, @ptrCast(?*c_void, out));
+        window.set_callbacks(size_cb, key_cb, mouse_cb, @ptrCast(?*c_void, out));
 
         // Attach the UI via RPC
         var options = msgpack.KeyValueMap.init(alloc);
@@ -583,7 +583,6 @@ pub const Tui = struct {
         if ((mods & c.GLFW_MOD_ALT) != 0) {
             out = try std.fmt.allocPrint(alloc, "D-{}", .{out});
         }
-        std.debug.assert(out.len != 0);
         return out;
     }
 
@@ -608,6 +607,7 @@ pub const Tui = struct {
             const mods_ = mods & (~@intCast(c_int, c.GLFW_MOD_SHIFT));
             if (mods_ != 0) {
                 const mod_str = try encode_mods(alloc, mods_);
+                std.debug.assert(mod_str.len != 0);
                 str = try std.fmt.allocPrint(alloc, "<{}{}>", .{ mod_str, str });
             }
         } else if (get_encoded(key)) |enc| {
@@ -631,6 +631,43 @@ pub const Tui = struct {
             defer self.rpc.release(reply);
         }
     }
+
+    pub fn on_mouse(self: *Self, button: c_int, action: c_int, mods: c_int) !void {
+        var arena = std.heap.ArenaAllocator.init(self.alloc);
+        var alloc: *std.mem.Allocator = &arena.allocator;
+        defer arena.deinit();
+
+        const button_str = switch (button) {
+            c.GLFW_MOUSE_BUTTON_LEFT => "left",
+            c.GLFW_MOUSE_BUTTON_RIGHT => "right",
+            c.GLFW_MOUSE_BUTTON_MIDDLE => "middle",
+            else => |b| {
+                std.debug.warn("Ignoring unknown mouse: {}\n", .{b});
+                return;
+            },
+        };
+
+        const action_str = switch (action) {
+            c.GLFW_PRESS => "press",
+            c.GLFW_RELEASE => "release",
+            else => |b| std.debug.panic("Invalid mouse action: {}\n", .{b}),
+        };
+
+        const mods_str = try encode_mods(alloc, mods);
+
+        // TODO: x/y position
+        const reply = self.rpc.call("nvim_input_mouse", .{
+            button_str,
+            action_str,
+            mods_str,
+            0, // grid
+            0, // row
+            0, // col
+        }) catch |err| {
+            std.debug.panic("Failed to call nvim_input_mouse: {}", .{err});
+        };
+        defer self.rpc.release(reply);
+    }
 };
 
 export fn size_cb(w: ?*c.GLFWwindow, width: c_int, height: c_int) void {
@@ -647,4 +684,12 @@ export fn key_cb(w: ?*c.GLFWwindow, key: c_int, scancode: c_int, action: c_int, 
             std.debug.panic("Failed on_key: {}\n", .{err});
         };
     }
+}
+
+export fn mouse_cb(w: ?*c.GLFWwindow, button: c_int, action: c_int, mods: c_int) void {
+    const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
+    var tui = @ptrCast(*Tui, @alignCast(8, ptr));
+    tui.on_mouse(button, action, mods) catch |err| {
+        std.debug.print("Failed on_mouse: {}\n", .{err});
+    };
 }

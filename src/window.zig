@@ -34,10 +34,12 @@ pub const Window = struct {
         self: *Self,
         size_cb: c.GLFWframebuffersizefun,
         key_cb: c.GLFWkeyfun,
+        mouse_cb: c.GLFWmousebuttonfun,
         data: ?*c_void,
     ) void {
         _ = c.glfwSetWindowUserPointer(self.window, data);
         _ = c.glfwSetFramebufferSizeCallback(self.window, size_cb);
         _ = c.glfwSetKeyCallback(self.window, key_cb);
+        _ = c.glfwSetMouseButtonCallback(self.window, mouse_cb);
     }
 };

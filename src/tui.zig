@@ -100,7 +100,13 @@ pub const Tui = struct {
             .uniforms_changed = true,
             .pixel_density = 1,
         };
-        window.set_callbacks(size_cb, key_cb, mouse_cb, @ptrCast(?*c_void, out));
+        window.set_callbacks(
+            size_cb,
+            key_cb,
+            mouse_button_cb,
+            mouse_pos_cb,
+            @ptrCast(?*c_void, out),
+        );
 
         // Attach the UI via RPC
         var options = msgpack.KeyValueMap.init(alloc);
@@ -632,7 +638,11 @@ pub const Tui = struct {
         }
     }
 
-    pub fn on_mouse(self: *Self, button: c_int, action: c_int, mods: c_int) !void {
+    pub fn on_mouse_pos(self: *Self, x: f64, y: f64) !void {
+        std.debug.print("{} {}\n", .{ x, y });
+    }
+
+    pub fn on_mouse_button(self: *Self, button: c_int, action: c_int, mods: c_int) !void {
         var arena = std.heap.ArenaAllocator.init(self.alloc);
         var alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
@@ -686,10 +696,18 @@ export fn key_cb(w: ?*c.GLFWwindow, key: c_int, scancode: c_int, action: c_int, 
     }
 }
 
-export fn mouse_cb(w: ?*c.GLFWwindow, button: c_int, action: c_int, mods: c_int) void {
+export fn mouse_pos_cb(w: ?*c.GLFWwindow, x: f64, y: f64) void {
     const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
     var tui = @ptrCast(*Tui, @alignCast(8, ptr));
-    tui.on_mouse(button, action, mods) catch |err| {
-        std.debug.print("Failed on_mouse: {}\n", .{err});
+    tui.on_mouse_pos(x, y) catch |err| {
+        std.debug.print("Failed on_mouse_pos: {}\n", .{err});
+    };
+}
+
+export fn mouse_button_cb(w: ?*c.GLFWwindow, button: c_int, action: c_int, mods: c_int) void {
+    const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
+    var tui = @ptrCast(*Tui, @alignCast(8, ptr));
+    tui.on_mouse_button(button, action, mods) catch |err| {
+        std.debug.print("Failed on_mouse_button: {}\n", .{err});
     };
 }

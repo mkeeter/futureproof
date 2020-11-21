@@ -110,7 +110,7 @@ pub const Tui = struct {
         );
         defer options.deinit();
         const reply = try rpc.call("nvim_ui_attach", .{ x_tiles, y_tiles, options });
-        defer reply.destroy(alloc);
+        defer rpc.release(reply);
 
         out.update_size(width, height);
 
@@ -380,7 +380,7 @@ pub const Tui = struct {
                     }
                 }
             }
-            try self.rpc.release_event(event);
+            self.rpc.release(event);
         }
 
         if (self.uniforms_changed) {
@@ -437,7 +437,7 @@ pub const Tui = struct {
         ) catch |err| {
             std.debug.panic("Failed to resize UI: {}\n", .{err});
         };
-        defer reply.destroy(self.alloc);
+        defer self.rpc.release(reply);
 
         self.char_grid[self.total_tiles] = cursor_x;
         self.char_grid[self.total_tiles + 1] = cursor_y;
@@ -628,7 +628,7 @@ pub const Tui = struct {
             const reply = self.rpc.call("nvim_input", arr) catch |err| {
                 std.debug.panic("Failed to call nvim_input: {}", .{err});
             };
-            defer reply.destroy(self.rpc.alloc);
+            defer self.rpc.release(reply);
         }
     }
 };

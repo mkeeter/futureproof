@@ -85,7 +85,7 @@ pub const RPC = struct {
         return self.listener.event_queue.try_get();
     }
 
-    pub fn release_event(self: *RPC, value: msgpack.Value) !void {
+    pub fn release(self: *RPC, value: msgpack.Value) void {
         value.destroy(self.alloc);
     }
 
@@ -102,7 +102,7 @@ pub const RPC = struct {
 
         // Wait for a reply from the worker thread
         const response = self.listener.response_queue.get();
-        defer response.destroy(self.alloc);
+        defer self.release(response);
 
         // Check that the msgids are correct
         std.debug.assert(response.Array[1].UInt == self.msgid);
@@ -137,7 +137,7 @@ pub const RPC = struct {
 
         // Flush out the queue to avoid memory leaks
         while (self.get_event()) |event| {
-            try self.release_event(event);
+            self.release(event);
         }
 
         return term;

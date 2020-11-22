@@ -39,8 +39,13 @@ pub const Window = struct {
         scroll_cb: c.GLFWscrollfun,
         data: ?*c_void,
     ) void {
+        // Attach the TUI handle to the window so we can extract it
         _ = c.glfwSetWindowUserPointer(self.window, data);
+
+        // Resizing the window
         _ = c.glfwSetFramebufferSizeCallback(self.window, size_cb);
+
+        // User input
         _ = c.glfwSetKeyCallback(self.window, key_cb);
         _ = c.glfwSetMouseButtonCallback(self.window, mouse_button_cb);
         _ = c.glfwSetCursorPosCallback(self.window, mouse_pos_cb);

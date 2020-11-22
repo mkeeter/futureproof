@@ -651,7 +651,17 @@ pub const Tui = struct {
     }
 
     pub fn on_scroll(self: *Self, dx: f64, dy: f64) !void {
-        std.debug.print("{} {}\n", .{ dx, dy });
+        const reply = self.rpc.call("nvim_input_mouse", .{
+            @as([]const u8, "wheel"),
+            if (dy > 0) @as([]const u8, "up") else @as([]const u8, "down"),
+            @as([]const u8, ""), // mods
+            0, // grid
+            self.mouse_tile_y, // row
+            self.mouse_tile_x, // col
+        }) catch |err| {
+            std.debug.panic("Failed to call nvim_input_mouse: {}", .{err});
+        };
+        defer self.rpc.release(reply);
     }
 
     pub fn on_mouse_button(self: *Self, button: c_int, action: c_int, mods: c_int) !void {
@@ -676,8 +686,6 @@ pub const Tui = struct {
         };
 
         const mods_str = try encode_mods(alloc, mods);
-
-        // TODO: x/y position
         const reply = self.rpc.call("nvim_input_mouse", .{
             button_str,
             action_str,

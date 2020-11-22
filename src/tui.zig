@@ -110,6 +110,7 @@ pub const Tui = struct {
             key_cb,
             mouse_button_cb,
             mouse_pos_cb,
+            scroll_cb,
             @ptrCast(?*c_void, out),
         );
 
@@ -649,6 +650,10 @@ pub const Tui = struct {
         self.mouse_tile_y = @floatToInt(i32, @intToFloat(f64, self.pixel_density) * y / @intToFloat(f64, self.u.font.glyph_height));
     }
 
+    pub fn on_scroll(self: *Self, dx: f64, dy: f64) !void {
+        std.debug.print("{} {}\n", .{ dx, dy });
+    }
+
     pub fn on_mouse_button(self: *Self, button: c_int, action: c_int, mods: c_int) !void {
         var arena = std.heap.ArenaAllocator.init(self.alloc);
         var alloc: *std.mem.Allocator = &arena.allocator;
@@ -716,5 +721,13 @@ export fn mouse_button_cb(w: ?*c.GLFWwindow, button: c_int, action: c_int, mods:
     var tui = @ptrCast(*Tui, @alignCast(8, ptr));
     tui.on_mouse_button(button, action, mods) catch |err| {
         std.debug.print("Failed on_mouse_button: {}\n", .{err});
+    };
+}
+
+export fn scroll_cb(w: ?*c.GLFWwindow, dx: f64, dy: f64) void {
+    const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
+    var tui = @ptrCast(*Tui, @alignCast(8, ptr));
+    tui.on_scroll(dx, dy) catch |err| {
+        std.debug.print("Failed on_scroll: {}\n", .{err});
     };
 }

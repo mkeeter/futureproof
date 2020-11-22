@@ -36,6 +36,7 @@ pub const Window = struct {
         key_cb: c.GLFWkeyfun,
         mouse_button_cb: c.GLFWmousebuttonfun,
         mouse_pos_cb: c.GLFWcursorposfun,
+        scroll_cb: c.GLFWscrollfun,
         data: ?*c_void,
     ) void {
         _ = c.glfwSetWindowUserPointer(self.window, data);
@@ -43,5 +44,6 @@ pub const Window = struct {
         _ = c.glfwSetKeyCallback(self.window, key_cb);
         _ = c.glfwSetMouseButtonCallback(self.window, mouse_button_cb);
         _ = c.glfwSetCursorPosCallback(self.window, mouse_pos_cb);
+        _ = c.glfwSetScrollCallback(self.window, scroll_cb);
     }
 };

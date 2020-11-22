@@ -651,10 +651,11 @@ pub const Tui = struct {
     }
 
     pub fn on_scroll(self: *Self, dx: f64, dy: f64) !void {
+        const dir = if (dy > 0) "up" else "down";
         const reply = self.rpc.call("nvim_input_mouse", .{
-            @as([]const u8, "wheel"),
-            if (dy > 0) @as([]const u8, "up") else @as([]const u8, "down"),
-            @as([]const u8, ""), // mods
+            "wheel",
+            dir,
+            "", // mods
             0, // grid
             self.mouse_tile_y, // row
             self.mouse_tile_x, // col

@@ -136,7 +136,6 @@ pub const Tui = struct {
         const grid = line[0].UInt;
         std.debug.assert(grid == 1);
 
-        // Welcome to the obnoxious math zone
         const top = line[1].UInt;
         const bot = line[2].UInt;
         const left = line[3].UInt;
@@ -145,15 +144,17 @@ pub const Tui = struct {
         const cols = line[6].UInt;
         std.debug.assert(cols == 0);
 
+        // rows > 0 --> moving rows upwards
         if (line[5] == .UInt) {
             const rows = line[5].UInt;
             var y = top;
-            while (y < top + rows) : (y += 1) {
+            while (y < bot - rows) : (y += 1) {
                 var x = left;
                 while (x < right) : (x += 1) {
                     self.char_at(x, y).* = self.char_at(x, y + rows).*;
                 }
             }
+            // rows < 0 --> moving rows downwards
         } else if (line[5] == .Int) {
             const rows = @intCast(u32, -line[5].Int);
             var y = bot - 1;

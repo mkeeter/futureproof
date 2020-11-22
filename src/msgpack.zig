@@ -96,17 +96,20 @@ pub const Value = union(enum) {
     pub fn encode(alloc: *std.mem.Allocator, v: anytype) !Value {
         const T = @TypeOf(v);
         switch (@typeInfo(T)) {
-            std.builtin.TypeId.Pointer => |ptr| {
-                const Size = std.builtin.TypeInfo.Pointer.Size;
+            .Pointer => |ptr| {
                 switch (ptr.size) {
-                    Size.One => {
-                        // Dereference and recurse
-                        // (coerces to an array in the case of constant strings)
-                        const child_type: type = ptr.child;
-                        const x: child_type = @as(child_type, v.*);
-                        return Value.encode(alloc, x);
+                    .One => {
+                        // We only encode things like *const [5:0]u8,
+                        // which are used for static strings.
+                        switch (@typeInfo(ptr.child)) {
+                            .Array => |array| {
+                                const x: []const array.child = v[0..];
+                                return Value.encode(alloc, x);
+                            },
+                            else => @compileError("Could not encode pointer"),
+                        }
                     },
-                    Size.Slice => {
+                    .Slice => {
                         // Special case to encode strings instead of Array(u8)
                         if (ptr.child == u8) {
                             return Value{ .RawString = v };
@@ -122,12 +125,12 @@ pub const Value = union(enum) {
                     else => @compileError("Cannot encode generic pointer"),
                 }
             },
-            std.builtin.TypeId.Array => |array| {
+            .Array => |array| {
                 // Coerce to slice
-                const x: []const array.child = &v;
+                const x: []const array.child = v[0..];
                 return encode(alloc, &x);
             },
-            std.builtin.TypeId.Struct => |st| {
+            .Struct => |st| {
                 if (@TypeOf(v) == KeyValueMap) {
                     return Value{ .Map = v };
                 } else {
@@ -608,7 +611,8 @@ test "msgpack.Value.encode string literal" {
     const alloc: *std.mem.Allocator = &arena.allocator;
     defer arena.deinit();
 
-    const v = try Value.encode(alloc, .{ "hello", "world" });
-    std.testing.expect(v == .Array);
-    std.testing.expectEqualStrings("hello", v.Array[0].RawString);
+    const h = "hello";
+    const v = try Value.encode(alloc, h);
+    std.testing.expect(v == .RawString);
+    std.testing.expectEqualStrings("hello", v.RawString);
 }

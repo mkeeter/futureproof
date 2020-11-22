@@ -30,6 +30,9 @@ pub const Tui = struct {
     y_tiles: u32,
     total_tiles: u32,
 
+    mouse_tile_x: i32,
+    mouse_tile_y: i32,
+
     //  Render state to pass into WGPU
     u: c.fpUniforms,
     uniforms_changed: bool,
@@ -88,6 +91,8 @@ pub const Tui = struct {
             .x_tiles = 0,
             .y_tiles = 0,
             .total_tiles = 0,
+            .mouse_tile_x = 0,
+            .mouse_tile_y = 0,
 
             .u = c.fpUniforms{
                 .width_px = @intCast(u32, width),
@@ -639,7 +644,8 @@ pub const Tui = struct {
     }
 
     pub fn on_mouse_pos(self: *Self, x: f64, y: f64) !void {
-        std.debug.print("{} {}\n", .{ x, y });
+        self.mouse_tile_x = @floatToInt(i32, @intToFloat(f64, self.pixel_density) * x / @intToFloat(f64, self.u.font.glyph_advance));
+        self.mouse_tile_y = @floatToInt(i32, @intToFloat(f64, self.pixel_density) * y / @intToFloat(f64, self.u.font.glyph_height));
     }
 
     pub fn on_mouse_button(self: *Self, button: c_int, action: c_int, mods: c_int) !void {
@@ -671,8 +677,8 @@ pub const Tui = struct {
             action_str,
             mods_str,
             0, // grid
-            0, // row
-            0, // col
+            self.mouse_tile_y, // row
+            self.mouse_tile_x, // col
         }) catch |err| {
             std.debug.panic("Failed to call nvim_input_mouse: {}", .{err});
         };

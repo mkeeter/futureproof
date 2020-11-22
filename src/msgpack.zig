@@ -604,6 +604,8 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
     };
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 test "msgpack.Value.encode string literal" {
     var gp_alloc = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.testing.expect(!gp_alloc.deinit());
@@ -611,8 +613,7 @@ test "msgpack.Value.encode string literal" {
     const alloc: *std.mem.Allocator = &arena.allocator;
     defer arena.deinit();
 
-    const h = "hello";
-    const v = try Value.encode(alloc, h);
+    const v = try Value.encode(alloc, "hello");
     std.testing.expect(v == .RawString);
     std.testing.expectEqualStrings("hello", v.RawString);
 }

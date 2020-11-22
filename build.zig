@@ -53,12 +53,4 @@ pub fn build(b: *Builder) void {
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
-
-    // Add a 'gen' command to rebuild bindings
-    const gen = b.addExecutable("gen", "src/gen.zig");
-    gen.install();
-    const gen_cmd = gen.run();
-    gen_cmd.step.dependOn(b.getInstallStep());
-    const gen_step = b.step("gen", "Generate Neovim bindings");
-    gen_step.dependOn(&gen_cmd.step);
 }

@@ -1,3 +1,6 @@
 [submodule "config/site/pack/plugins/start/zig.vim"]
 	path = config/site/pack/plugins/start/zig.vim
 	url = https://github.com/ziglang/zig.vim
+[submodule "config/site/pack/plugins/start/vim-glsl"]
+	path = config/site/pack/plugins/start/vim-glsl
+	url = https://github.com/tikhomirov/vim-glsl

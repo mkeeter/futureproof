@@ -1,4 +1,5 @@
 set runtimepath=config,$VIMRUNTIME
+set packpath+=config/site
 
 colorscheme solarized
 

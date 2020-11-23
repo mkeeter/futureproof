@@ -1,0 +1,3 @@
+[submodule "config/site/pack/plugins/start/zig.vim"]
+	path = config/site/pack/plugins/start/zig.vim
+	url = https://github.com/ziglang/zig.vim

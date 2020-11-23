@@ -1,7 +1,10 @@
 set runtimepath=config,$VIMRUNTIME
 set packpath+=config/site
 
-colorscheme solarized
+colorscheme monokai
+
+" Buffers can exist in the background without being in a window
+set hidden
 
 " Line numbers
 set number

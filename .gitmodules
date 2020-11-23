@@ -4,3 +4,6 @@
 [submodule "config/site/pack/plugins/start/vim-glsl"]
 	path = config/site/pack/plugins/start/vim-glsl
 	url = https://github.com/tikhomirov/vim-glsl
+[submodule "config/site/pack/plugins/start/vim-monokai"]
+	path = config/site/pack/plugins/start/vim-monokai
+	url = https://github.com/sickill/vim-monokai

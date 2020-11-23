@@ -10,7 +10,7 @@ const Window = @import("window.zig").Window;
 
 const FONT_NAME = "font/Inconsolata-SemiBold.ttf";
 const FONT_SIZE = 16;
-const SCROLL_THRESHOLD = 2.0;
+const SCROLL_THRESHOLD = 0.1;
 
 pub const Tui = struct {
     const Self = @This();
@@ -656,7 +656,7 @@ pub const Tui = struct {
 
     pub fn on_scroll(self: *Self, dx: f64, dy: f64) !void {
         // Reset accumulator if we've changed directions
-        if (std.math.signbit(dy) != std.math.signbit(self.mouse_scroll_y)) {
+        if (self.mouse_scroll_y != 0 and std.math.signbit(dy) != std.math.signbit(self.mouse_scroll_y)) {
             self.mouse_scroll_y = 0;
         }
         self.mouse_scroll_y += dy;

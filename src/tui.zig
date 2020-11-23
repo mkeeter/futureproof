@@ -10,6 +10,7 @@ const Window = @import("window.zig").Window;
 
 const FONT_NAME = "font/Inconsolata-SemiBold.ttf";
 const FONT_SIZE = 16;
+const SCROLL_THRESHOLD = 2.0;
 
 pub const Tui = struct {
     const Self = @This();
@@ -32,6 +33,7 @@ pub const Tui = struct {
 
     mouse_tile_x: i32,
     mouse_tile_y: i32,
+    mouse_scroll_y: f64,
 
     //  Render state to pass into WGPU
     u: c.fpUniforms,
@@ -91,8 +93,10 @@ pub const Tui = struct {
             .x_tiles = 0,
             .y_tiles = 0,
             .total_tiles = 0,
+
             .mouse_tile_x = 0,
             .mouse_tile_y = 0,
+            .mouse_scroll_y = 0.0,
 
             .u = c.fpUniforms{
                 .width_px = @intCast(u32, width),
@@ -651,18 +655,30 @@ pub const Tui = struct {
     }
 
     pub fn on_scroll(self: *Self, dx: f64, dy: f64) !void {
-        const dir = if (dy > 0) "up" else "down";
-        const reply = self.rpc.call("nvim_input_mouse", .{
-            "wheel",
-            dir,
-            "", // mods
-            0, // grid
-            self.mouse_tile_y, // row
-            self.mouse_tile_x, // col
-        }) catch |err| {
-            std.debug.panic("Failed to call nvim_input_mouse: {}", .{err});
-        };
-        defer self.rpc.release(reply);
+        // Reset accumulator if we've changed directions
+        if (std.math.signbit(dy) != std.math.signbit(self.mouse_scroll_y)) {
+            self.mouse_scroll_y = 0;
+        }
+        self.mouse_scroll_y += dy;
+        while (std.math.absFloat(self.mouse_scroll_y) >= SCROLL_THRESHOLD) {
+            if (self.mouse_scroll_y > 0) {
+                self.mouse_scroll_y -= SCROLL_THRESHOLD;
+            } else {
+                self.mouse_scroll_y += SCROLL_THRESHOLD;
+            }
+            const dir = if (self.mouse_scroll_y > 0) "up" else "down";
+            const reply = self.rpc.call("nvim_input_mouse", .{
+                "wheel",
+                dir,
+                "", // mods
+                0, // grid
+                self.mouse_tile_y, // row
+                self.mouse_tile_x, // col
+            }) catch |err| {
+                std.debug.panic("Failed to call nvim_input_mouse: {}", .{err});
+            };
+            self.rpc.release(reply);
+        }
     }
 
     pub fn on_mouse_button(self: *Self, button: c_int, action: c_int, mods: c_int) !void {

@@ -49,7 +49,12 @@ void main() {
         colors = colors * mat3(0, 1, 0, 1, 0, 0, 0, 0, 1);
     }
 
-    if (v_cursor != -1) {
+    // In some cases, cells are stretched to deal with a window that isn't
+    // an integral number of grid tiles.  If that's the case, then we
+    // don't draw the cursor over the stretched region.
+    if (v_cursor != -1 && v_cell_coords.x >= 0.0 && v_cell_coords.x <= 1.0 &&
+                          v_cell_coords.y >= 0.0 && v_cell_coords.y <= 1.0)
+    {
         fpMode mode = u.modes[v_cursor];
         fpHlAttrs attrs = u.attrs[mode.attr_id];
 

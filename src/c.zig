@@ -3,10 +3,6 @@ const builtin = @import("builtin");
 pub usingnamespace @cImport({
     // GLFW
     @cInclude("GLFW/glfw3.h");
-    if (builtin.os.tag == builtin.Os.Tag.macos) {
-        @cDefine("GLFW_EXPOSE_NATIVE_COCOA", {});
-    }
-    @cInclude("GLFW/glfw3native.h");
 
     // Freetype
     @cInclude("ft2build.h");
@@ -17,3 +13,8 @@ pub usingnamespace @cImport({
 
     @cInclude("futureproof.h");
 });
+
+// Normally, this would be declared in "GLFW/glfw3native.h" after defining
+// GLFW_EXPOSE_NATIVE_COCOA.  However, for mysterious reasons, this header
+// can't be included (https://github.com/Homebrew/homebrew-core/issues/44579)
+pub extern fn glfwGetCocoaWindow(window: ?*GLFWwindow) callconv(.C) ?*c_void;

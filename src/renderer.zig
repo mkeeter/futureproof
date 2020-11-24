@@ -38,7 +38,6 @@ pub const Renderer = struct {
             // We import this separately because glfw3native.h defines id as void*,
             // while objc/runtime.h defines it as a struct*, so we have to cast
             const o = @cImport({
-                @cInclude("objc/runtime.h");
                 @cInclude("objc/message.h");
             });
 
@@ -49,13 +48,32 @@ pub const Renderer = struct {
             //  [ns_window.contentView setWantsLayer:YES];
             //  id metal_layer = [CAMetalLayer layer];
             //  [ns_window.contentView setLayer:metal_layer];
-            const cv = o.objc_msgSend(ns_window, o.sel_getUid("contentView"));
-            _ = o.objc_msgSend(cv, o.sel_getUid("setWantsLayer:"), true);
+            //
+            //  To make matters even more exciting, objc_msgSend has the
+            //  prototype "void objc_msgSend(void)", so we have to cast it
+            //  based on the types of our arguments
+            //  (https://www.mikeash.com/pyblog/objc_msgsends-new-prototype.html)
+            const uid = o.sel_getUid("contentView");
+            var call_sel = @ptrCast(
+                fn (o.id, o.SEL) callconv(.C) o.id,
+                o.objc_msgSend,
+            );
+            const cv = call_sel(ns_window, uid);
+
+            var call_sel_bool = @ptrCast(
+                fn (o.id, o.SEL, bool) callconv(.C) o.id,
+                o.objc_msgSend,
+            );
+            _ = call_sel_bool(cv, o.sel_getUid("setWantsLayer:"), true);
 
             const ca_metal = @ptrCast(o.id, o.objc_lookUpClass("CAMetalLayer"));
-            const metal_layer = o.objc_msgSend(ca_metal, o.sel_getUid("layer"));
+            const metal_layer = call_sel(ca_metal, o.sel_getUid("layer"));
 
-            _ = o.objc_msgSend(cv, o.sel_getUid("setLayer:"), metal_layer);
+            var call_sel_id = @ptrCast(
+                fn (o.id, o.SEL, o.id) callconv(.C) o.id,
+                o.objc_msgSend,
+            );
+            _ = call_sel_id(cv, o.sel_getUid("setLayer:"), metal_layer);
 
             break :surf c.wgpu_create_surface_from_metal_layer(metal_layer);
         } else {

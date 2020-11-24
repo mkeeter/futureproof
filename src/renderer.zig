@@ -5,6 +5,8 @@ const c = @import("c.zig");
 const shaderc = @import("shaderc.zig");
 const ft = @import("ft.zig");
 
+const Preview = @import("preview.zig").Preview;
+
 pub const Renderer = struct {
     const Self = @This();
 
@@ -26,6 +28,8 @@ pub const Renderer = struct {
 
     render_pipeline: c.WGPURenderPipelineId,
     pipeline_layout: c.WGPUPipelineLayoutId,
+
+    preview: *Preview,
 
     pub fn init(alloc: *std.mem.Allocator, window: *c.GLFWwindow, font: *const ft.Atlas) !Self {
         var arena = std.heap.ArenaAllocator.init(alloc);
@@ -350,6 +354,8 @@ pub const Renderer = struct {
 
             .render_pipeline = render_pipeline,
             .pipeline_layout = pipeline_layout,
+
+            .preview = try Preview.init(alloc, device),
         };
 
         out.update_font_tex(font);

@@ -32,7 +32,7 @@ ivec2 vertex_position(uint i) {
 
 void main() {
     uint tile_id = gl_VertexIndex / 6;
-    const uint x_tiles = u.width_px / u.font.glyph_advance;
+    const uint x_tiles = u.width_px / u.font.glyph_advance / 2;
     const uint y_tiles = u.height_px / u.font.glyph_height;
     const uint total_tiles = x_tiles * y_tiles;
 
@@ -57,17 +57,14 @@ void main() {
     ivec2 tile_pos_px = (tile + p) * ivec2(u.font.glyph_advance, u.font.glyph_height);
 
     // Stretch tiles at the edges of the grid to avoid empty space
-    const uint x_padding = (u.width_px - u.font.glyph_advance * x_tiles);
+    const uint x_padding = (u.width_px / 2 - u.font.glyph_advance * x_tiles);
     float dx = 0;
     if (x_padding > 0) {
-        if (tile_x == 0 && p.x == 0) {
-            // Nothing to do, leave it at the baseline
-            dx = -int(x_padding) / 2.0;
-        } else if (tile_x == x_tiles - 1 && p.x == 1) {
-            dx = int(x_padding) / 2.0;
+        if (tile_x == x_tiles - 1 && p.x == 1) {
+            dx = int(x_padding);
             tile_pos_px.x += int(x_padding);
         } else {
-            tile_pos_px.x += int(x_padding / 2);
+            // Nothing to do here, leave in place
         }
     }
     const uint y_padding = (u.height_px - u.font.glyph_height * y_tiles);

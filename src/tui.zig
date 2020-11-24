@@ -441,7 +441,7 @@ pub const Tui = struct {
         const cursor_x = self.char_grid[self.total_tiles];
         const cursor_y = self.char_grid[self.total_tiles + 1];
 
-        self.x_tiles = self.u.width_px / self.u.font.glyph_advance;
+        self.x_tiles = self.u.width_px / self.u.font.glyph_advance / 2;
         self.y_tiles = self.u.height_px / self.u.font.glyph_height;
         self.total_tiles = self.x_tiles * self.y_tiles;
 

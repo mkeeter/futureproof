@@ -29,7 +29,7 @@ pub const Renderer = struct {
     render_pipeline: c.WGPURenderPipelineId,
     pipeline_layout: c.WGPUPipelineLayoutId,
 
-    preview: *Preview,
+    preview: Preview,
 
     pub fn init(alloc: *std.mem.Allocator, window: *c.GLFWwindow, font: *const ft.Atlas) !Self {
         var arena = std.heap.ArenaAllocator.init(alloc);
@@ -427,8 +427,10 @@ pub const Renderer = struct {
         c.wgpu_render_pass_set_pipeline(rpass, self.render_pipeline);
         c.wgpu_render_pass_set_bind_group(rpass, 0, self.bind_group, null, 0);
         c.wgpu_render_pass_draw(rpass, total_tiles * 6, 1, 0, 0);
-
         c.wgpu_render_pass_end_pass(rpass);
+
+        self.preview.redraw(next_texture, cmd_encoder);
+
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);
         c.wgpu_queue_submit(self.queue, &cmd_buf, 1);
         c.wgpu_swap_chain_present(self.swap_chain);

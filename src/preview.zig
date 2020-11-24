@@ -6,7 +6,13 @@ const shaderc = @import("shaderc.zig");
 pub const Preview = struct {
     const Self = @This();
 
-    pub fn init(alloc: *std.mem.Allocator, device: c.WGPUDeviceId) !*Preview {
+    bind_group: c.WGPUBindGroupId,
+    bind_group_layout: c.WGPUBindGroupLayoutId,
+
+    render_pipeline: c.WGPURenderPipelineId,
+    pipeline_layout: c.WGPUPipelineLayoutId,
+
+    pub fn init(alloc: *std.mem.Allocator, device: c.WGPUDeviceId) !Preview {
         var arena = std.heap.ArenaAllocator.init(alloc);
         const tmp_alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
@@ -103,8 +109,46 @@ pub const Preview = struct {
             },
         );
 
-        var out = try alloc.create(Self);
-        out.* = Self{};
-        return out;
+        return Self{
+            .render_pipeline = render_pipeline,
+            .pipeline_layout = pipeline_layout,
+            .bind_group = bind_group,
+            .bind_group_layout = bind_group_layout,
+        };
+    }
+
+    pub fn deinit(self: *Self) void {
+        c.wgpu_bind_group_destroy(self.bind_group);
+        c.wgpu_bind_group_layout_destroy(self.bind_group_layout);
+        c.wgpu_pipeline_layout_destroy(self.pipeline_layout);
+    }
+
+    pub fn redraw(self: *Self, next_texture: c.WGPUSwapChainOutput, cmd_encoder: c.WGPUCommandEncoderId) void {
+        const color_attachments = [_]c.WGPURenderPassColorAttachmentDescriptor{
+            (c.WGPURenderPassColorAttachmentDescriptor){
+                .attachment = next_texture.view_id,
+                .resolve_target = 0,
+                .channel = (c.WGPUPassChannel_Color){
+                    .load_op = c.WGPULoadOp._Load,
+                    .store_op = c.WGPUStoreOp._Store,
+                    .clear_value = undefined,
+                    .read_only = false,
+                },
+            },
+        };
+
+        const rpass = c.wgpu_command_encoder_begin_render_pass(
+            cmd_encoder,
+            &(c.WGPURenderPassDescriptor){
+                .color_attachments = &color_attachments,
+                .color_attachments_length = color_attachments.len,
+                .depth_stencil_attachment = null,
+            },
+        );
+
+        c.wgpu_render_pass_set_pipeline(rpass, self.render_pipeline);
+        c.wgpu_render_pass_set_bind_group(rpass, 0, self.bind_group, null, 0);
+        c.wgpu_render_pass_draw(rpass, 3, 1, 0, 0);
+        c.wgpu_render_pass_end_pass(rpass);
     }
 };

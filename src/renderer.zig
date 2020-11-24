@@ -84,7 +84,7 @@ pub const Renderer = struct {
         // WGPU initial setup
         var adapter: c.WGPUAdapterId = 0;
         c.wgpu_request_adapter_async(&(c.WGPURequestAdapterOptions){
-            .power_preference = @intToEnum(c.WGPUPowerPreference, c.WGPUPowerPreference_HighPerformance),
+            .power_preference = c.WGPUPowerPreference._HighPerformance,
             .compatible_surface = surface,
         }, 2 | 4 | 8, false, adapter_cb, &adapter);
 
@@ -122,8 +122,8 @@ pub const Renderer = struct {
             .size = tex_size,
             .mip_level_count = 1,
             .sample_count = 1,
-            .dimension = @intToEnum(c.WGPUTextureDimension, c.WGPUTextureDimension_D2),
-            .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_Rgba8Unorm),
+            .dimension = c.WGPUTextureDimension._D2,
+            .format = c.WGPUTextureFormat._Rgba8Unorm,
             // SAMPLED tells wgpu that we want to use this texture in shaders
             // COPY_DST means that we want to copy data to this texture
             .usage = c.WGPUTextureUsage_SAMPLED | c.WGPUTextureUsage_COPY_DST,
@@ -132,9 +132,9 @@ pub const Renderer = struct {
 
         const tex_view = c.wgpu_texture_create_view(tex, &(c.WGPUTextureViewDescriptor){
             .label = "font_atlas_view",
-            .dimension = @intToEnum(c.WGPUTextureViewDimension, c.WGPUTextureViewDimension_D2),
-            .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_Rgba8Unorm),
-            .aspect = @intToEnum(c.WGPUTextureAspect, c.WGPUTextureAspect_All),
+            .dimension = c.WGPUTextureViewDimension._D2,
+            .format = c.WGPUTextureFormat._Rgba8Unorm,
+            .aspect = c.WGPUTextureAspect._All,
             .base_mip_level = 0,
             .level_count = 1,
             .base_array_layer = 0,
@@ -144,15 +144,15 @@ pub const Renderer = struct {
         const tex_sampler = c.wgpu_device_create_sampler(device, &(c.WGPUSamplerDescriptor){
             .next_in_chain = null,
             .label = "font_atlas_sampler",
-            .address_mode_u = @intToEnum(c.WGPUAddressMode, c.WGPUAddressMode_ClampToEdge),
-            .address_mode_v = @intToEnum(c.WGPUAddressMode, c.WGPUAddressMode_ClampToEdge),
-            .address_mode_w = @intToEnum(c.WGPUAddressMode, c.WGPUAddressMode_ClampToEdge),
-            .mag_filter = @intToEnum(c.WGPUFilterMode, c.WGPUFilterMode_Linear),
-            .min_filter = @intToEnum(c.WGPUFilterMode, c.WGPUFilterMode_Nearest),
-            .mipmap_filter = @intToEnum(c.WGPUFilterMode, c.WGPUFilterMode_Nearest),
+            .address_mode_u = c.WGPUAddressMode._ClampToEdge,
+            .address_mode_v = c.WGPUAddressMode._ClampToEdge,
+            .address_mode_w = c.WGPUAddressMode._ClampToEdge,
+            .mag_filter = c.WGPUFilterMode._Linear,
+            .min_filter = c.WGPUFilterMode._Nearest,
+            .mipmap_filter = c.WGPUFilterMode._Nearest,
             .lod_min_clamp = 0.0,
             .lod_max_clamp = std.math.f32_max,
-            .compare = @intToEnum(c.WGPUCompareFunction, c.WGPUCompareFunction_Undefined),
+            .compare = c.WGPUCompareFunction._Undefined,
         });
 
         ////////////////////////////////////////////////////////////////////////////
@@ -179,9 +179,9 @@ pub const Renderer = struct {
                 .ty = c.WGPUBindingType_SampledTexture,
 
                 .multisampled = false,
-                .view_dimension = @intToEnum(c.WGPUTextureViewDimension, c.WGPUTextureViewDimension_D2),
-                .texture_component_type = @intToEnum(c.WGPUTextureComponentType, c.WGPUTextureComponentType_Uint),
-                .storage_texture_format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_Rgba8Unorm),
+                .view_dimension = c.WGPUTextureViewDimension._D2,
+                .texture_component_type = c.WGPUTextureComponentType._Uint,
+                .storage_texture_format = c.WGPUTextureFormat._Rgba8Unorm,
 
                 .count = undefined,
                 .has_dynamic_offset = undefined,
@@ -298,31 +298,31 @@ pub const Renderer = struct {
                 .entry_point = "main",
             },
             .rasterization_state = &(c.WGPURasterizationStateDescriptor){
-                .front_face = @intToEnum(c.WGPUFrontFace, c.WGPUFrontFace_Ccw),
-                .cull_mode = @intToEnum(c.WGPUCullMode, c.WGPUCullMode_None),
+                .front_face = c.WGPUFrontFace._Ccw,
+                .cull_mode = c.WGPUCullMode._None,
                 .depth_bias = 0,
                 .depth_bias_slope_scale = 0.0,
                 .depth_bias_clamp = 0.0,
             },
-            .primitive_topology = @intToEnum(c.WGPUPrimitiveTopology, c.WGPUPrimitiveTopology_TriangleList),
+            .primitive_topology = c.WGPUPrimitiveTopology._TriangleList,
             .color_states = &(c.WGPUColorStateDescriptor){
-                .format = @intToEnum(c.WGPUTextureFormat, c.WGPUTextureFormat_Bgra8Unorm),
+                .format = c.WGPUTextureFormat._Bgra8Unorm,
                 .alpha_blend = (c.WGPUBlendDescriptor){
-                    .src_factor = @intToEnum(c.WGPUBlendFactor, c.WGPUBlendFactor_One),
-                    .dst_factor = @intToEnum(c.WGPUBlendFactor, c.WGPUBlendFactor_Zero),
-                    .operation = @intToEnum(c.WGPUBlendOperation, c.WGPUBlendOperation_Add),
+                    .src_factor = c.WGPUBlendFactor._One,
+                    .dst_factor = c.WGPUBlendFactor._Zero,
+                    .operation = c.WGPUBlendOperation._Add,
                 },
                 .color_blend = (c.WGPUBlendDescriptor){
-                    .src_factor = @intToEnum(c.WGPUBlendFactor, c.WGPUBlendFactor_One),
-                    .dst_factor = @intToEnum(c.WGPUBlendFactor, c.WGPUBlendFactor_Zero),
-                    .operation = @intToEnum(c.WGPUBlendOperation, c.WGPUBlendOperation_Add),
+                    .src_factor = c.WGPUBlendFactor._One,
+                    .dst_factor = c.WGPUBlendFactor._Zero,
+                    .operation = c.WGPUBlendOperation._Add,
                 },
                 .write_mask = c.WGPUColorWrite_ALL,
             },
             .color_states_length = 1,
             .depth_stencil_state = null,
             .vertex_state = (c.WGPUVertexStateDescriptor){
-                .index_format = @intToEnum(c.WGPUIndexFormat, c.WGPUIndexFormat_Uint16),
+                .index_format = c.WGPUIndexFormat._Uint16,
                 .vertex_buffers = null,
                 .vertex_buffers_length = 0,
             },
@@ -396,8 +396,8 @@ pub const Renderer = struct {
                 .attachment = next_texture.view_id,
                 .resolve_target = 0,
                 .channel = (c.WGPUPassChannel_Color){
-                    .load_op = @intToEnum(c.WGPULoadOp, c.WGPULoadOp_Clear),
-                    .store_op = @intToEnum(c.WGPUStoreOp, c.WGPUStoreOp_Store),
+                    .load_op = c.WGPULoadOp._Clear,
+                    .store_op = c.WGPUStoreOp._Store,
                     .clear_value = (c.WGPUColor){
                         .r = 0.0,
                         .g = 0.0,
@@ -459,16 +459,10 @@ pub const Renderer = struct {
             self.surface,
             &(c.WGPUSwapChainDescriptor){
                 .usage = c.WGPUTextureUsage_OUTPUT_ATTACHMENT,
-                .format = @intToEnum(
-                    c.WGPUTextureFormat,
-                    c.WGPUTextureFormat_Bgra8Unorm,
-                ),
+                .format = c.WGPUTextureFormat._Bgra8Unorm,
                 .width = width,
                 .height = height,
-                .present_mode = @intToEnum(
-                    c.WGPUPresentMode,
-                    c.WGPUPresentMode_Fifo,
-                ),
+                .present_mode = c.WGPUPresentMode._Fifo,
             },
         );
     }

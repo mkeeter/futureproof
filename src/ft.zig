@@ -59,7 +59,7 @@ pub const Atlas = struct {
         ));
         try status_to_err(c.FT_Render_Glyph(
             self.face.*.glyph,
-            @intToEnum(c.FT_Render_Mode, c.FT_RENDER_MODE_LCD),
+            c.FT_Render_Mode.FT_RENDER_MODE_LCD,
         ));
         const glyph = self.face.*.glyph;
         const bmp = &(glyph.*.bitmap);

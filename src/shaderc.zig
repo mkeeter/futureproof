@@ -97,7 +97,15 @@ pub fn build_shader(alloc: *std.mem.Allocator, name: []const u8, src: []const u8
     const options = c.shaderc_compile_options_initialize();
     c.shaderc_compile_options_set_include_callbacks(options, include_cb, include_release_cb, alloc);
 
-    const result = c.shaderc_compile_into_spv(compiler, src.ptr, src.len, @intToEnum(c.shaderc_shader_kind, c.shaderc_glsl_infer_from_source), name.ptr, "main", options);
+    const result = c.shaderc_compile_into_spv(
+        compiler,
+        src.ptr,
+        src.len,
+        c.shaderc_shader_kind.shaderc_glsl_infer_from_source,
+        name.ptr,
+        "main",
+        options,
+    );
     defer c.shaderc_result_release(result);
     const r = c.shaderc_result_get_compilation_status(result);
     if (@enumToInt(r) != c.shaderc_compilation_status_success) {

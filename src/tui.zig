@@ -130,10 +130,17 @@ pub const Tui = struct {
             defer rpc.release(reply);
         }
 
-        {
+        { // Attach to the default buffer
             var options = msgpack.KeyValueMap.init(alloc);
             defer options.deinit();
             const reply = try rpc.call("nvim_buf_attach", .{ 0, false, options });
+            defer rpc.release(reply);
+        }
+
+        { // Try to subscribe to events
+            var options = msgpack.KeyValueMap.init(alloc);
+            defer options.deinit();
+            const reply = try rpc.call("nvim_subscribe", .{"Fp"});
             defer rpc.release(reply);
         }
 
@@ -381,6 +388,38 @@ pub const Tui = struct {
                 return false;
             }
 
+            // Call methods separately
+            if (event.Array[2].Array[0] == .Ext) {
+                const cmd = event.Array[1].RawString;
+                std.debug.print("Method call on {x}\n  ", .{event.Array[2].Array[0].Ext.data});
+                if (std.mem.eql(u8, cmd, "nvim_buf_lines_event")) {
+                    std.debug.print("TODO: nvim_buf_lines_event\n", .{});
+                }
+                for (event.Array) |a| {
+                    std.debug.print("{} ", .{a});
+                }
+                std.debug.print("\n   ", .{});
+                std.debug.print("Method args: ", .{});
+                for (event.Array[2].Array) |a| {
+                    std.debug.print("{} ", .{a});
+                }
+                std.debug.print("\n", .{});
+                continue;
+            }
+
+            if (std.mem.eql(u8, "Fp", event.Array[1].RawString)) {
+                std.debug.print("Fp event:\n   ", .{});
+                for (event.Array) |a| {
+                    std.debug.print("{}", .{a});
+                }
+                std.debug.print("\n    ", .{});
+                for (event.Array[2].Array) |a| {
+                    std.debug.print("{}", .{a});
+                }
+                std.debug.print("\n", .{});
+                continue;
+            }
+
             const apis = [_][]const u8{
                 "grid_line",
                 "grid_scroll",
@@ -392,19 +431,6 @@ pub const Tui = struct {
                 "mode_info_set",
                 "mode_change",
             };
-
-            if (event.Array[2].Array[0] == .Ext) {
-                for (event.Array) |a| {
-                    std.debug.print("{} ", .{a});
-                }
-                std.debug.print("\n   ", .{});
-                std.debug.print("Got method: ", .{});
-                for (event.Array[2].Array) |a| {
-                    std.debug.print("{} ", .{a});
-                }
-                std.debug.print("\n", .{});
-                continue;
-            }
 
             for (event.Array[2].Array) |cmd| {
                 inline for (apis) |api| {

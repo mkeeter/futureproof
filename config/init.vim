@@ -21,3 +21,9 @@ set list listchars=tab:\ \ ,trail:·
 " Wrapping
 set nowrap " Don't wrap lines by default
 set linebreak " When wrapping, break at convenient points
+
+" ------------------------------------------------------------------------------
+augroup fp
+  autocmd!
+  autocmd BufNew * call rpcnotify(0, 'Fp', 'buf_new', expand('<abuf>'))
+augroup end

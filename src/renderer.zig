@@ -36,15 +36,9 @@ pub const Renderer = struct {
 
         // Extract the WGPU Surface from the platform-specific window
         const platform = builtin.os.tag;
-        const surface = if (platform == builtin.Os.Tag.macos) surf: {
-            // We import this separately because glfw3native.h defines id as void*,
-            // while objc/runtime.h defines it as a struct*, so we have to cast
-            const o = @cImport({
-                @cInclude("objc/message.h");
-            });
-
+        const surface = if (platform == .macos) surf: {
             const cocoa_window = c.glfwGetCocoaWindow(window);
-            const ns_window = @ptrCast(o.id, @alignCast(8, cocoa_window));
+            const ns_window = @ptrCast(c.id, @alignCast(8, cocoa_window));
 
             // Time to do hilarious Objective-C runtime hacks, equivalent to
             //  [ns_window.contentView setWantsLayer:YES];
@@ -55,27 +49,27 @@ pub const Renderer = struct {
             //  prototype "void objc_msgSend(void)", so we have to cast it
             //  based on the types of our arguments
             //  (https://www.mikeash.com/pyblog/objc_msgsends-new-prototype.html)
-            const uid = o.sel_getUid("contentView");
+            const uid = c.sel_getUid("contentView");
             var call_sel = @ptrCast(
-                fn (o.id, o.SEL) callconv(.C) o.id,
-                o.objc_msgSend,
+                fn (c.id, c.SEL) callconv(.C) c.id,
+                c.objc_msgSend,
             );
             const cv = call_sel(ns_window, uid);
 
             var call_sel_bool = @ptrCast(
-                fn (o.id, o.SEL, bool) callconv(.C) o.id,
-                o.objc_msgSend,
+                fn (c.id, c.SEL, bool) callconv(.C) c.id,
+                c.objc_msgSend,
             );
-            _ = call_sel_bool(cv, o.sel_getUid("setWantsLayer:"), true);
+            _ = call_sel_bool(cv, c.sel_getUid("setWantsLayer:"), true);
 
-            const ca_metal = @ptrCast(o.id, o.objc_lookUpClass("CAMetalLayer"));
-            const metal_layer = call_sel(ca_metal, o.sel_getUid("layer"));
+            const ca_metal = @ptrCast(c.id, c.objc_lookUpClass("CAMetalLayer"));
+            const metal_layer = call_sel(ca_metal, c.sel_getUid("layer"));
 
             var call_sel_id = @ptrCast(
-                fn (o.id, o.SEL, o.id) callconv(.C) o.id,
-                o.objc_msgSend,
+                fn (c.id, c.SEL, c.id) callconv(.C) c.id,
+                c.objc_msgSend,
             );
-            _ = call_sel_id(cv, o.sel_getUid("setLayer:"), metal_layer);
+            _ = call_sel_id(cv, c.sel_getUid("setLayer:"), metal_layer);
 
             break :surf c.wgpu_create_surface_from_metal_layer(metal_layer);
         } else {

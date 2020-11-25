@@ -12,6 +12,10 @@ pub usingnamespace @cImport({
     @cInclude("shaderc/shaderc.h");
 
     @cInclude("futureproof.h");
+
+    if (builtin.os.tag == .macos) {
+        @cInclude("objc/message.h");
+    }
 });
 
 // Normally, this would be declared in "GLFW/glfw3native.h" after defining

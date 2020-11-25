@@ -22,12 +22,10 @@ pub const Renderer = struct {
     queue: c.WGPUQueueId,
 
     bind_group: c.WGPUBindGroupId,
-    bind_group_layout: c.WGPUBindGroupLayoutId,
     uniform_buffer: c.WGPUBufferId,
     char_grid_buffer: c.WGPUBufferId,
 
     render_pipeline: c.WGPURenderPipelineId,
-    pipeline_layout: c.WGPUPipelineLayoutId,
 
     preview: Preview,
 
@@ -92,27 +90,39 @@ pub const Renderer = struct {
             .compatible_surface = surface,
         }, 2 | 4 | 8, false, adapter_cb, &adapter);
 
-        const device = c.wgpu_adapter_request_device(adapter, 0, &(c.WGPUCLimits){
-            .max_bind_groups = 1,
-        }, true, null);
+        const device = c.wgpu_adapter_request_device(
+            adapter,
+            0,
+            &(c.WGPUCLimits){
+                .max_bind_groups = 1,
+            },
+            true,
+            null,
+        );
 
         ////////////////////////////////////////////////////////////////////////////
         // Build the shaders using shaderc
         const vert_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/grid.vert") catch |err| {
             std.debug.panic("Could not open file", .{});
         };
-        const vert_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
-            .bytes = vert_spv.ptr,
-            .length = vert_spv.len,
-        });
+        const vert_shader = c.wgpu_device_create_shader_module(
+            device,
+            (c.WGPUShaderSource){
+                .bytes = vert_spv.ptr,
+                .length = vert_spv.len,
+            },
+        );
 
         const frag_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/grid.frag") catch |err| {
             std.debug.panic("Could not open file", .{});
         };
-        const frag_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
-            .bytes = frag_spv.ptr,
-            .length = frag_spv.len,
-        });
+        const frag_shader = c.wgpu_device_create_shader_module(
+            device,
+            (c.WGPUShaderSource){
+                .bytes = frag_spv.ptr,
+                .length = frag_spv.len,
+            },
+        );
 
         ////////////////////////////////////////////////////////////////////////////
         // Upload the font atlas texture
@@ -238,6 +248,8 @@ pub const Renderer = struct {
             .entries = &bind_group_layout_entries,
             .entries_length = bind_group_layout_entries.len,
         });
+        defer c.wgpu_bind_group_layout_destroy(bind_group_layout);
+
         const bind_group_entries = [_]c.WGPUBindGroupEntry{
             (c.WGPUBindGroupEntry){
                 .binding = 0,
@@ -286,54 +298,61 @@ pub const Renderer = struct {
 
         ////////////////////////////////////////////////////////////////////////////
         // Render pipelines (?!?)
-        const pipeline_layout = c.wgpu_device_create_pipeline_layout(device, &(c.WGPUPipelineLayoutDescriptor){
-            .bind_group_layouts = &bind_group_layouts,
-            .bind_group_layouts_length = bind_group_layouts.len,
-        });
+        const pipeline_layout = c.wgpu_device_create_pipeline_layout(
+            device,
+            &(c.WGPUPipelineLayoutDescriptor){
+                .bind_group_layouts = &bind_group_layouts,
+                .bind_group_layouts_length = bind_group_layouts.len,
+            },
+        );
+        defer c.wgpu_pipeline_layout_destroy(pipeline_layout);
 
-        const render_pipeline = c.wgpu_device_create_render_pipeline(device, &(c.WGPURenderPipelineDescriptor){
-            .layout = pipeline_layout,
-            .vertex_stage = (c.WGPUProgrammableStageDescriptor){
-                .module = vert_shader,
-                .entry_point = "main",
-            },
-            .fragment_stage = &(c.WGPUProgrammableStageDescriptor){
-                .module = frag_shader,
-                .entry_point = "main",
-            },
-            .rasterization_state = &(c.WGPURasterizationStateDescriptor){
-                .front_face = c.WGPUFrontFace._Ccw,
-                .cull_mode = c.WGPUCullMode._None,
-                .depth_bias = 0,
-                .depth_bias_slope_scale = 0.0,
-                .depth_bias_clamp = 0.0,
-            },
-            .primitive_topology = c.WGPUPrimitiveTopology._TriangleList,
-            .color_states = &(c.WGPUColorStateDescriptor){
-                .format = c.WGPUTextureFormat._Bgra8Unorm,
-                .alpha_blend = (c.WGPUBlendDescriptor){
-                    .src_factor = c.WGPUBlendFactor._One,
-                    .dst_factor = c.WGPUBlendFactor._Zero,
-                    .operation = c.WGPUBlendOperation._Add,
+        const render_pipeline = c.wgpu_device_create_render_pipeline(
+            device,
+            &(c.WGPURenderPipelineDescriptor){
+                .layout = pipeline_layout,
+                .vertex_stage = (c.WGPUProgrammableStageDescriptor){
+                    .module = vert_shader,
+                    .entry_point = "main",
                 },
-                .color_blend = (c.WGPUBlendDescriptor){
-                    .src_factor = c.WGPUBlendFactor._One,
-                    .dst_factor = c.WGPUBlendFactor._Zero,
-                    .operation = c.WGPUBlendOperation._Add,
+                .fragment_stage = &(c.WGPUProgrammableStageDescriptor){
+                    .module = frag_shader,
+                    .entry_point = "main",
                 },
-                .write_mask = c.WGPUColorWrite_ALL,
+                .rasterization_state = &(c.WGPURasterizationStateDescriptor){
+                    .front_face = c.WGPUFrontFace._Ccw,
+                    .cull_mode = c.WGPUCullMode._None,
+                    .depth_bias = 0,
+                    .depth_bias_slope_scale = 0.0,
+                    .depth_bias_clamp = 0.0,
+                },
+                .primitive_topology = c.WGPUPrimitiveTopology._TriangleList,
+                .color_states = &(c.WGPUColorStateDescriptor){
+                    .format = c.WGPUTextureFormat._Bgra8Unorm,
+                    .alpha_blend = (c.WGPUBlendDescriptor){
+                        .src_factor = c.WGPUBlendFactor._One,
+                        .dst_factor = c.WGPUBlendFactor._Zero,
+                        .operation = c.WGPUBlendOperation._Add,
+                    },
+                    .color_blend = (c.WGPUBlendDescriptor){
+                        .src_factor = c.WGPUBlendFactor._One,
+                        .dst_factor = c.WGPUBlendFactor._Zero,
+                        .operation = c.WGPUBlendOperation._Add,
+                    },
+                    .write_mask = c.WGPUColorWrite_ALL,
+                },
+                .color_states_length = 1,
+                .depth_stencil_state = null,
+                .vertex_state = (c.WGPUVertexStateDescriptor){
+                    .index_format = c.WGPUIndexFormat._Uint16,
+                    .vertex_buffers = null,
+                    .vertex_buffers_length = 0,
+                },
+                .sample_count = 1,
+                .sample_mask = 0,
+                .alpha_to_coverage_enabled = false,
             },
-            .color_states_length = 1,
-            .depth_stencil_state = null,
-            .vertex_state = (c.WGPUVertexStateDescriptor){
-                .index_format = c.WGPUIndexFormat._Uint16,
-                .vertex_buffers = null,
-                .vertex_buffers_length = 0,
-            },
-            .sample_count = 1,
-            .sample_mask = 0,
-            .alpha_to_coverage_enabled = false,
-        });
+        );
 
         var out = Renderer{
             .tex = tex,
@@ -348,12 +367,10 @@ pub const Renderer = struct {
             .queue = c.wgpu_device_get_default_queue(device),
 
             .bind_group = bind_group,
-            .bind_group_layout = bind_group_layout,
             .uniform_buffer = uniform_buffer,
             .char_grid_buffer = char_grid_buffer,
 
             .render_pipeline = render_pipeline,
-            .pipeline_layout = pipeline_layout,
 
             .preview = try Preview.init(alloc, device),
         };
@@ -442,11 +459,12 @@ pub const Renderer = struct {
         c.wgpu_sampler_destroy(self.tex_sampler);
 
         c.wgpu_bind_group_destroy(self.bind_group);
-        c.wgpu_bind_group_layout_destroy(self.bind_group_layout);
         c.wgpu_buffer_destroy(self.uniform_buffer);
         c.wgpu_buffer_destroy(self.char_grid_buffer);
 
-        c.wgpu_pipeline_layout_destroy(self.pipeline_layout);
+        c.wgpu_render_pipeline_destroy(self.render_pipeline);
+
+        self.preview.deinit();
 
         c.glfwDestroyWindow(self.window);
     }

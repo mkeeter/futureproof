@@ -7,10 +7,7 @@ pub const Preview = struct {
     const Self = @This();
 
     bind_group: c.WGPUBindGroupId,
-    bind_group_layout: c.WGPUBindGroupLayoutId,
-
     render_pipeline: c.WGPURenderPipelineId,
-    pipeline_layout: c.WGPUPipelineLayoutId,
 
     pub fn init(alloc: *std.mem.Allocator, device: c.WGPUDeviceId) !Preview {
         var arena = std.heap.ArenaAllocator.init(alloc);
@@ -21,17 +18,23 @@ pub const Preview = struct {
         const vert_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/preview.vert") catch |err| {
             std.debug.panic("Could not open file", .{});
         };
-        const vert_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
-            .bytes = vert_spv.ptr,
-            .length = vert_spv.len,
-        });
+        const vert_shader = c.wgpu_device_create_shader_module(
+            device,
+            (c.WGPUShaderSource){
+                .bytes = vert_spv.ptr,
+                .length = vert_spv.len,
+            },
+        );
         const frag_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/preview.frag") catch |err| {
             std.debug.panic("Could not open file", .{});
         };
-        const frag_shader = c.wgpu_device_create_shader_module(device, (c.WGPUShaderSource){
-            .bytes = frag_spv.ptr,
-            .length = frag_spv.len,
-        });
+        const frag_shader = c.wgpu_device_create_shader_module(
+            device,
+            (c.WGPUShaderSource){
+                .bytes = frag_spv.ptr,
+                .length = frag_spv.len,
+            },
+        );
 
         ////////////////////////////////////////////////////////////////////////////////
         const bind_group_layout = c.wgpu_device_create_bind_group_layout(
@@ -42,6 +45,7 @@ pub const Preview = struct {
                 .entries_length = 0,
             },
         );
+        defer c.wgpu_bind_group_layout_destroy(bind_group_layout);
         const bind_group = c.wgpu_device_create_bind_group(
             device,
             &(c.WGPUBindGroupDescriptor){
@@ -61,6 +65,7 @@ pub const Preview = struct {
                 .bind_group_layouts_length = bind_group_layouts.len,
             },
         );
+        defer c.wgpu_pipeline_layout_destroy(pipeline_layout);
 
         const render_pipeline = c.wgpu_device_create_render_pipeline(
             device,
@@ -111,19 +116,20 @@ pub const Preview = struct {
 
         return Self{
             .render_pipeline = render_pipeline,
-            .pipeline_layout = pipeline_layout,
             .bind_group = bind_group,
-            .bind_group_layout = bind_group_layout,
         };
     }
 
     pub fn deinit(self: *Self) void {
         c.wgpu_bind_group_destroy(self.bind_group);
-        c.wgpu_bind_group_layout_destroy(self.bind_group_layout);
-        c.wgpu_pipeline_layout_destroy(self.pipeline_layout);
+        c.wgpu_render_pipeline_destroy(self.render_pipeline);
     }
 
-    pub fn redraw(self: *Self, next_texture: c.WGPUSwapChainOutput, cmd_encoder: c.WGPUCommandEncoderId) void {
+    pub fn redraw(
+        self: *Self,
+        next_texture: c.WGPUSwapChainOutput,
+        cmd_encoder: c.WGPUCommandEncoderId,
+    ) void {
         const color_attachments = [_]c.WGPURenderPassColorAttachmentDescriptor{
             (c.WGPURenderPassColorAttachmentDescriptor){
                 .attachment = next_texture.view_id,

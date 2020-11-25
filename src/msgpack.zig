@@ -55,6 +55,11 @@ pub const KeyValueMap = std.hash_map.HashMap(
     std.hash_map.DefaultMaxLoadPercentage,
 );
 
+pub const Ext = struct {
+    type: i8,
+    data: []const u8,
+};
+
 pub const Value = union(enum) {
     Int: i64,
     UInt: u64,
@@ -66,7 +71,7 @@ pub const Value = union(enum) {
     RawData: []const u8,
     Array: []Value,
     Map: KeyValueMap,
-    Extension: void, // unimplemented
+    Ext: Ext,
 
     pub fn destroy(self: Value, alloc: *std.mem.Allocator) void {
         var self_mut = self;
@@ -88,6 +93,9 @@ pub const Value = union(enum) {
                     r_mut.destroy(alloc);
                 }
                 alloc.free(arr);
+            },
+            .Ext => |ext| {
+                alloc.free(ext.data);
             },
             else => {},
         }
@@ -365,7 +373,46 @@ pub const Value = union(enum) {
                 }
             },
 
-            .Extension => std.debug.panic("Not implemented\n", .{}),
+            .Ext => |e| {
+                const count = e.data.len;
+                switch (count) {
+                    0x01 => {
+                        _ = try out.writeByte(0xd4);
+                    },
+                    0x02 => {
+                        _ = try out.writeByte(0xd5);
+                    },
+                    0x04 => {
+                        _ = try out.writeByte(0xd6);
+                    },
+                    0x08 => {
+                        _ = try out.writeByte(0xd7);
+                    },
+                    0x10 => {
+                        _ = try out.writeByte(0xd8);
+                    },
+
+                    0x00, 0x03, 0x05...0x07, 0x09...0x0f, 0x11...0xff => {
+                        _ = try out.writeByte(0xc7);
+                        _ = try out.writeByte(@intCast(u8, count));
+                    },
+                    std.math.maxInt(u8) + 1...std.math.maxInt(u16) => {
+                        _ = try out.writeByte(0xc8);
+                        const j = std.mem.nativeToBig(u16, @intCast(u16, count));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    std.math.maxInt(u16) + 1...std.math.maxInt(u32) => {
+                        _ = try out.writeByte(0xc9);
+                        const j = std.mem.nativeToBig(u32, @intCast(u32, count));
+                        _ = try out.write(&std.mem.toBytes(j));
+                    },
+                    std.math.maxInt(u32) + 1...std.math.maxInt(u64) => {
+                        std.debug.panic("Ext data is too large: {}\n", .{count});
+                    },
+                }
+                _ = try out.writeByte(@bitCast(u8, e.type));
+                _ = try out.write(e.data);
+            },
         }
     }
 };
@@ -397,9 +444,29 @@ fn decode_bin(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !De
     const d = try decode_generic(T, data);
     const n = d.data;
     offset += d.offset;
-    var out = try alloc.dupe(u8, data[offset..(offset + n)]);
+    const out = try alloc.dupe(u8, data[offset..(offset + n)]);
     offset += n;
     return Decoded{ .data = Value{ .RawData = out }, .offset = offset };
+}
+
+fn decode_fixext(comptime len: u32, alloc: *std.mem.Allocator, data: []const u8) !Decoded {
+    var offset: usize = 0;
+    const t = @bitCast(i8, data[0]);
+    offset += 1;
+    const buf = try alloc.dupe(u8, data[offset..(offset + len)]);
+    return Decoded{
+        .data = Value{ .Ext = .{ .type = t, .data = buf } },
+        .offset = offset + len,
+    };
+}
+
+fn decode_ext(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !Decoded {
+    const t = @bitCast(i8, data[0]);
+    var out = try decode_bin(T, alloc, data[1..]);
+    return Decoded{
+        .data = Value{ .Ext = .{ .type = t, .data = out.data.RawData } },
+        .offset = out.offset + 1,
+    };
 }
 
 fn decode_array_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decoded {
@@ -502,7 +569,21 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
             offset += out.offset;
             break :bin32 out.data;
         },
-        0xc7...0xc9 => return MsgPackError.NoExtensionsAllowed,
+        0xc7 => ext8: {
+            const out = try decode_ext(u8, alloc, data[offset..]);
+            offset += out.offset;
+            break :ext8 out.data;
+        },
+        0xc8 => ext16: {
+            const out = try decode_ext(u16, alloc, data[offset..]);
+            offset += out.offset;
+            break :ext16 out.data;
+        },
+        0xc9 => ext32: {
+            const out = try decode_ext(u32, alloc, data[offset..]);
+            offset += out.offset;
+            break :ext32 out.data;
+        },
         0xca => f32: {
             const out = try decode_generic(f32, data[offset..]);
             offset += out.offset;
@@ -554,8 +635,31 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
             break :i64 Value{ .Int = out.data };
         },
 
-        // TODO: all the fixext
-        0xd4...0xd8 => return MsgPackError.NoExtensionsAllowed,
+        0xd4 => fixext1: {
+            const out = try decode_fixext(1, alloc, data[offset..]);
+            offset += out.offset;
+            break :fixext1 out.data;
+        },
+        0xd5 => fixext2: {
+            const out = try decode_fixext(2, alloc, data[offset..]);
+            offset += out.offset;
+            break :fixext2 out.data;
+        },
+        0xd6 => fixext4: {
+            const out = try decode_fixext(4, alloc, data[offset..]);
+            offset += out.offset;
+            break :fixext4 out.data;
+        },
+        0xd7 => fixext8: {
+            const out = try decode_fixext(8, alloc, data[offset..]);
+            offset += out.offset;
+            break :fixext8 out.data;
+        },
+        0xd8 => fixext16: {
+            const out = try decode_fixext(16, alloc, data[offset..]);
+            offset += out.offset;
+            break :fixext16 out.data;
+        },
 
         0xd9 => str8: {
             const out = try decode_bin(u8, alloc, data[offset..]);

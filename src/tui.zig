@@ -119,14 +119,23 @@ pub const Tui = struct {
         );
 
         // Attach the UI via RPC
-        var options = msgpack.KeyValueMap.init(alloc);
-        try options.put(
-            msgpack.Key{ .RawString = "ext_linegrid" },
-            msgpack.Value{ .Boolean = true },
-        );
-        defer options.deinit();
-        const reply = try rpc.call("nvim_ui_attach", .{ x_tiles, y_tiles, options });
-        defer rpc.release(reply);
+        {
+            var options = msgpack.KeyValueMap.init(alloc);
+            try options.put(
+                msgpack.Key{ .RawString = "ext_linegrid" },
+                msgpack.Value{ .Boolean = true },
+            );
+            defer options.deinit();
+            const reply = try rpc.call("nvim_ui_attach", .{ x_tiles, y_tiles, options });
+            defer rpc.release(reply);
+        }
+
+        {
+            var options = msgpack.KeyValueMap.init(alloc);
+            defer options.deinit();
+            const reply = try rpc.call("nvim_buf_attach", .{ 0, false, options });
+            defer rpc.release(reply);
+        }
 
         out.update_size(width, height);
 
@@ -367,6 +376,7 @@ pub const Tui = struct {
 
     pub fn tick(self: *Self) !bool {
         while (self.rpc.get_event()) |event| {
+            defer self.rpc.release(event);
             if (event == .Int) {
                 return false;
             }
@@ -383,6 +393,19 @@ pub const Tui = struct {
                 "mode_change",
             };
 
+            if (event.Array[2].Array[0] == .Ext) {
+                for (event.Array) |a| {
+                    std.debug.print("{} ", .{a});
+                }
+                std.debug.print("\n   ", .{});
+                std.debug.print("Got method: ", .{});
+                for (event.Array[2].Array) |a| {
+                    std.debug.print("{} ", .{a});
+                }
+                std.debug.print("\n", .{});
+                continue;
+            }
+
             for (event.Array[2].Array) |cmd| {
                 inline for (apis) |api| {
                     comptime const opts = std.builtin.CallOptions{};
@@ -397,7 +420,6 @@ pub const Tui = struct {
                     }
                 }
             }
-            self.rpc.release(event);
         }
 
         if (self.uniforms_changed) {
@@ -661,12 +683,12 @@ pub const Tui = struct {
         }
         self.mouse_scroll_y += dy;
         while (std.math.absFloat(self.mouse_scroll_y) >= SCROLL_THRESHOLD) {
+            const dir = if (self.mouse_scroll_y > 0) "up" else "down";
             if (self.mouse_scroll_y > 0) {
                 self.mouse_scroll_y -= SCROLL_THRESHOLD;
             } else {
                 self.mouse_scroll_y += SCROLL_THRESHOLD;
             }
-            const dir = if (self.mouse_scroll_y > 0) "up" else "down";
             const reply = self.rpc.call("nvim_input_mouse", .{
                 "wheel",
                 dir,

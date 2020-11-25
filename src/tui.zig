@@ -388,7 +388,7 @@ pub const Tui = struct {
                 return false;
             }
 
-            // Call methods separately
+            // Methods are called on Ext objects (buffers, windows, etc)
             if (event.Array[2].Array[0] == .Ext) {
                 const cmd = event.Array[1].RawString;
                 std.debug.print("Method call on {x}\n  ", .{event.Array[2].Array[0].Ext.data});
@@ -404,10 +404,10 @@ pub const Tui = struct {
                     std.debug.print("{} ", .{a});
                 }
                 std.debug.print("\n", .{});
-                continue;
             }
-
-            if (std.mem.eql(u8, "Fp", event.Array[1].RawString)) {
+            // We attach a few autocommands to rpcnotify(0, 'Fp', ...), which
+            // are handled here.
+            else if (std.mem.eql(u8, "Fp", event.Array[1].RawString)) {
                 std.debug.print("Fp event:\n   ", .{});
                 for (event.Array) |a| {
                     std.debug.print("{}", .{a});
@@ -417,32 +417,39 @@ pub const Tui = struct {
                     std.debug.print("{}", .{a});
                 }
                 std.debug.print("\n", .{});
-                continue;
             }
+            // Otherwise, we compare against a list of implemented APIs, by
+            // doing a comptime unrolled loop that finds api_XYZ functions
+            // and compares against them by name.
+            else {
+                // Work around issue #4639 by storing opts in a variable
+                comptime const opts = std.builtin.CallOptions{};
 
-            const apis = [_][]const u8{
-                "grid_line",
-                "grid_scroll",
-                "flush",
-                "grid_clear",
-                "grid_cursor_goto",
-                "hl_attr_define",
-                "default_colors_set",
-                "mode_info_set",
-                "mode_change",
-            };
-
-            for (event.Array[2].Array) |cmd| {
-                inline for (apis) |api| {
-                    comptime const opts = std.builtin.CallOptions{};
-                    if (std.mem.eql(u8, cmd.Array[0].RawString, api)) {
-                        for (cmd.Array[1..]) |v| {
-                            @call(
-                                opts,
-                                @field(Self, "api_" ++ api),
-                                .{ self, v.Array },
-                            );
+                // For each command in the incoming stream, try to match
+                // it against a local api_XYZ declaration.
+                for (event.Array[2].Array) |cmd| {
+                    var matched = false;
+                    const api_name = cmd.Array[0].RawString;
+                    inline for (@typeInfo(Self).Struct.decls) |s| {
+                        // This conditional should be optimized out, since
+                        // it's known at comptime.
+                        comptime const is_api = std.mem.startsWith(u8, s.name, "api_");
+                        if (is_api) {
+                            if (std.mem.eql(u8, api_name, s.name[4..])) {
+                                for (cmd.Array[1..]) |v| {
+                                    @call(
+                                        opts,
+                                        @field(Self, s.name),
+                                        .{ self, v.Array },
+                                    );
+                                }
+                                matched = true;
+                                break;
+                            }
                         }
+                    }
+                    if (!matched) {
+                        std.debug.warn("Unimplemented API: {}\n", .{api_name});
                     }
                 }
             }

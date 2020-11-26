@@ -406,23 +406,20 @@ pub const Tui = struct {
         const target = event[2].Array[0].Ext;
         if (target.type == 0) { // Buffer
             const buf_num = try target.as_u32();
-            var done = false;
             if (self.buffers.get(buf_num)) |buf| {
-                done = buf.rpc_method(
-                    event[1].RawString,
-                    event[2].Array[1..],
-                );
+                const name = event[1].RawString;
+                const args = event[2].Array[1..];
+                switch (buf.rpc_method(name, args)) {
+                    .Changed => {},
+                    .Done => {
+                        buf.deinit();
+                        self.alloc.destroy(buf);
+                        _ = self.buffers.remove(buf_num);
+                    },
+                    .Okay => {},
+                }
             } else {
                 std.debug.warn("Invalid buffer: {}\n", .{buf_num});
-            }
-            // Destroy the buffer if requested
-            if (done) {
-                if (self.buffers.remove(buf_num)) |buf| {
-                    buf.value.deinit();
-                    self.alloc.destroy(buf.value);
-                } else {
-                    unreachable;
-                }
             }
         } else {
             std.debug.warn("Unknown method target: {}\n", .{target.type});

@@ -2,6 +2,12 @@ const std = @import("std");
 
 const msgpack = @import("msgpack.zig");
 
+pub const Status = enum {
+    Okay,
+    Changed,
+    Done,
+};
+
 pub const Buffer = struct {
     const Self = @This();
 
@@ -37,7 +43,7 @@ pub const Buffer = struct {
         self.lines = new_lines;
     }
 
-    fn api_lines_event(self: *Buffer, args: []const msgpack.Value) bool {
+    fn api_lines_event(self: *Buffer, args: []const msgpack.Value) Status {
         const first = args[1].UInt;
         const last = args[2].UInt;
         const lines = args[3].Array;
@@ -59,16 +65,16 @@ pub const Buffer = struct {
             lines[i - first] = .Nil;
         }
 
-        return false;
+        return Status.Changed;
     }
 
     // This API event is the only one which returns 'true', indicating
     // that the buffer should be destroyed
-    fn api_detach_event(self: *Buffer, args: []const msgpack.Value) bool {
-        return true;
+    fn api_detach_event(self: *Buffer, args: []const msgpack.Value) Status {
+        return Status.Done;
     }
 
-    pub fn rpc_method(self: *Buffer, name: []const u8, args: []const msgpack.Value) bool {
+    pub fn rpc_method(self: *Buffer, name: []const u8, args: []const msgpack.Value) Status {
         // Same trick as in tui.zig
         comptime const opts = std.builtin.CallOptions{};
         inline for (@typeInfo(Self).Struct.decls) |s| {
@@ -83,6 +89,6 @@ pub const Buffer = struct {
             }
         }
         std.debug.warn("[Buffer] Unimplemented API: {}\n", .{name});
-        return false;
+        return Status.Okay;
     }
 };

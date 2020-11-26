@@ -66,7 +66,7 @@ pub const Tui = struct {
 
         // Create a buffer on the heap and store it in the hash map.
         var buf = try self.alloc.create(Buffer);
-        buf.* = Buffer.init(self.alloc);
+        buf.* = try Buffer.init(self.alloc);
         try self.buffers.put(id, buf);
     }
 
@@ -470,7 +470,7 @@ pub const Tui = struct {
                         }
                     }
                     if (!matched) {
-                        std.debug.warn("Unimplemented API: {}\n", .{api_name});
+                        std.debug.warn("[Tui] Unimplemented API: {}\n", .{api_name});
                     }
                 }
             }

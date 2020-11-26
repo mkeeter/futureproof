@@ -23,14 +23,6 @@ pub const Buffer = struct {
         self.alloc.free(self.lines);
     }
 
-    fn api_changedtick_event(self: *Buffer, args: []const msgpack.Value) void {
-        std.debug.print("changedtick_event\n   ", .{});
-        for (args) |a| {
-            std.debug.print("{} ", .{a});
-        }
-        std.debug.print("\n", .{});
-    }
-
     fn resize_lines_to(self: *Buffer, count: u64) !void {
         std.debug.assert(count > self.lines.len);
         const new_lines = try self.alloc.alloc([]const u8, count);
@@ -45,7 +37,7 @@ pub const Buffer = struct {
         self.lines = new_lines;
     }
 
-    fn api_lines_event(self: *Buffer, args: []const msgpack.Value) void {
+    fn api_lines_event(self: *Buffer, args: []const msgpack.Value) bool {
         const first = args[1].UInt;
         const last = args[2].UInt;
         const lines = args[3].Array;
@@ -61,14 +53,22 @@ pub const Buffer = struct {
         var i = first;
         while (i < last) : (i += 1) {
             self.alloc.free(self.lines[i]);
+
+            // Steal the value from the msgpack array
             self.lines[i] = lines[i - first].RawString;
             lines[i - first] = .Nil;
         }
+
+        return false;
     }
 
-    pub fn rpc_method(self: *Buffer, name: []const u8, args: []const msgpack.Value) void {
-        var matched = false;
+    // This API event is the only one which returns 'true', indicating
+    // that the buffer should be destroyed
+    fn api_detach_event(self: *Buffer, args: []const msgpack.Value) bool {
+        return true;
+    }
 
+    pub fn rpc_method(self: *Buffer, name: []const u8, args: []const msgpack.Value) bool {
         // Same trick as in tui.zig
         comptime const opts = std.builtin.CallOptions{};
         inline for (@typeInfo(Self).Struct.decls) |s| {
@@ -78,14 +78,11 @@ pub const Buffer = struct {
             if (is_api) {
                 // Skip nvim_buf_ in the RPC name and api_ in the API name
                 if (std.mem.eql(u8, name[9..], s.name[4..])) {
-                    @call(opts, @field(Self, s.name), .{ self, args });
-                    matched = true;
-                    break;
+                    return @call(opts, @field(Self, s.name), .{ self, args });
                 }
             }
         }
-        if (!matched) {
-            std.debug.warn("[Buffer] Unimplemented API: {}\n", .{name});
-        }
+        std.debug.warn("[Buffer] Unimplemented API: {}\n", .{name});
+        return false;
     }
 };

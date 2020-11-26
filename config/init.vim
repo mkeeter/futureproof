@@ -25,5 +25,5 @@ set linebreak " When wrapping, break at convenient points
 " ------------------------------------------------------------------------------
 augroup fp
   autocmd!
-  autocmd BufNew * call rpcnotify(0, 'Fp', 'buf_new', expand('<abuf>'))
+  autocmd BufNew * call rpcnotify(0, 'Fp', 'buf_new', str2nr(expand('<abuf>')))
 augroup end

@@ -4,6 +4,7 @@ const c = @import("c.zig");
 const ft = @import("ft.zig");
 const msgpack = @import("msgpack.zig");
 
+const Buffer = @import("buffer.zig").Buffer;
 const Renderer = @import("renderer.zig").Renderer;
 const RPC = @import("rpc.zig").RPC;
 const Window = @import("window.zig").Window;
@@ -26,6 +27,8 @@ pub const Tui = struct {
     rpc: RPC,
     font: ft.Atlas,
 
+    buffers: std.AutoHashMap(u32, *Buffer),
+
     char_grid: [512 * 512]u32,
     x_tiles: u32,
     y_tiles: u32,
@@ -41,10 +44,30 @@ pub const Tui = struct {
 
     pixel_density: u32,
 
-    pub fn deinit(self: *Tui) void {
+    pub fn deinit(self: *Self) void {
         self.rpc.deinit();
         self.font.deinit();
+
+        var itr = self.buffers.iterator();
+        while (itr.next()) |buf| {
+            buf.value.deinit();
+            self.alloc.destroy(buf.value);
+        }
+        self.buffers.deinit();
+
         self.alloc.destroy(self);
+    }
+
+    fn attach_buffer(self: *Self, id: u32) !void {
+        var options = msgpack.KeyValueMap.init(self.alloc);
+        defer options.deinit();
+        const reply = try self.rpc.call("nvim_buf_attach", .{ id, false, options });
+        defer self.rpc.release(reply);
+
+        // Create a buffer on the heap and store it in the hash map.
+        var buf = try self.alloc.create(Buffer);
+        buf.* = Buffer.init(self.alloc);
+        try self.buffers.put(id, buf);
     }
 
     pub fn init(alloc: *std.mem.Allocator) !*Self {
@@ -80,14 +103,16 @@ pub const Tui = struct {
         };
         var rpc = try RPC.init(&nvim_cmd, alloc);
 
-        const out = try alloc.create(Tui);
-        out.* = Tui{
+        const out = try alloc.create(Self);
+        out.* = .{
             .alloc = alloc,
 
             .window = window,
             .renderer = renderer,
             .rpc = rpc,
             .font = font,
+
+            .buffers = std.AutoHashMap(u32, *Buffer).init(alloc),
 
             .char_grid = undefined,
             .x_tiles = 0,
@@ -130,19 +155,15 @@ pub const Tui = struct {
             defer rpc.release(reply);
         }
 
-        { // Attach to the default buffer
-            var options = msgpack.KeyValueMap.init(alloc);
-            defer options.deinit();
-            const reply = try rpc.call("nvim_buf_attach", .{ 0, false, options });
-            defer rpc.release(reply);
-        }
-
-        { // Try to subscribe to events
+        { // Try to subscribe to Fp events
             var options = msgpack.KeyValueMap.init(alloc);
             defer options.deinit();
             const reply = try rpc.call("nvim_subscribe", .{"Fp"});
             defer rpc.release(reply);
         }
+
+        // Attach to events from the first buffer
+        try out.attach_buffer(1);
 
         out.update_size(width, height);
 
@@ -390,20 +411,20 @@ pub const Tui = struct {
 
             // Methods are called on Ext objects (buffers, windows, etc)
             if (event.Array[2].Array[0] == .Ext) {
-                const cmd = event.Array[1].RawString;
-                std.debug.print("Method call on {x}\n  ", .{event.Array[2].Array[0].Ext.data});
-                if (std.mem.eql(u8, cmd, "nvim_buf_lines_event")) {
-                    std.debug.print("TODO: nvim_buf_lines_event\n", .{});
+                const target = event.Array[2].Array[0].Ext;
+                if (target.type == 0) { // Buffer
+                    const buf_num = try target.as_u32();
+                    if (self.buffers.get(buf_num)) |buf| {
+                        buf.rpc_method(
+                            event.Array[1].RawString,
+                            event.Array[2].Array[1..],
+                        );
+                    } else {
+                        std.debug.warn("Invalid buffer: {}\n", .{buf_num});
+                    }
+                } else {
+                    std.debug.print("Unknown method target: {}\n", .{target.type});
                 }
-                for (event.Array) |a| {
-                    std.debug.print("{} ", .{a});
-                }
-                std.debug.print("\n   ", .{});
-                std.debug.print("Method args: ", .{});
-                for (event.Array[2].Array) |a| {
-                    std.debug.print("{} ", .{a});
-                }
-                std.debug.print("\n", .{});
             }
             // We attach a few autocommands to rpcnotify(0, 'Fp', ...), which
             // are handled here.

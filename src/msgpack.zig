@@ -8,6 +8,7 @@ const MsgPackError = error{
     NotAMap,
     NoSuchKey,
     InvalidValueType,
+    IntOverflow,
 };
 
 pub const Key = union(enum) {
@@ -58,6 +59,20 @@ pub const KeyValueMap = std.hash_map.HashMap(
 pub const Ext = struct {
     type: i8,
     data: []const u8,
+
+    pub fn as_u32(self: *const Ext) !u32 {
+        if (self.data.len > 4) {
+            return MsgPackError.IntOverflow;
+        } else {
+            var out: u32 = 0;
+            var i: u32 = 0;
+            while (i < self.data.len) : (i += 1) {
+                const j: u32 = i * 8;
+                out |= @intCast(u32, self.data[i]) << @intCast(u5, j);
+            }
+            return out;
+        }
+    }
 };
 
 pub const Value = union(enum) {

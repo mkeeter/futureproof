@@ -402,6 +402,78 @@ pub const Tui = struct {
         self.uniforms_changed = true;
     }
 
+    fn call_method(self: *Self, event: []const msgpack.Value) !void {
+        const target = event[2].Array[0].Ext;
+        if (target.type == 0) { // Buffer
+            const buf_num = try target.as_u32();
+            var done = false;
+            if (self.buffers.get(buf_num)) |buf| {
+                done = buf.rpc_method(
+                    event[1].RawString,
+                    event[2].Array[1..],
+                );
+            } else {
+                std.debug.warn("Invalid buffer: {}\n", .{buf_num});
+            }
+            // Destroy the buffer if requested
+            if (done) {
+                if (self.buffers.remove(buf_num)) |buf| {
+                    buf.value.deinit();
+                    self.alloc.destroy(buf.value);
+                } else {
+                    unreachable;
+                }
+            }
+        } else {
+            std.debug.warn("Unknown method target: {}\n", .{target.type});
+        }
+    }
+
+    fn call_fp(self: *Self, event: []const msgpack.Value) !void {
+        std.debug.print("Fp event:\n   ", .{});
+        for (event) |a| {
+            std.debug.print("{}", .{a});
+        }
+        std.debug.print("\n    ", .{});
+        for (event[2].Array) |a| {
+            std.debug.print("{}", .{a});
+        }
+        std.debug.print("\n", .{});
+    }
+
+    fn call_api(self: *Self, event: []const msgpack.Value) !void {
+        // Work around issue #4639 by storing opts in a variable
+        comptime const opts = std.builtin.CallOptions{};
+
+        // For each command in the incoming stream, try to match
+        // it against a local api_XYZ declaration.
+        for (event[2].Array) |cmd| {
+            var matched = false;
+            const api_name = cmd.Array[0].RawString;
+            inline for (@typeInfo(Self).Struct.decls) |s| {
+                // This conditional should be optimized out, since
+                // it's known at comptime.
+                comptime const is_api = std.mem.startsWith(u8, s.name, "api_");
+                if (is_api) {
+                    if (std.mem.eql(u8, api_name, s.name[4..])) {
+                        for (cmd.Array[1..]) |v| {
+                            @call(
+                                opts,
+                                @field(Self, s.name),
+                                .{ self, v.Array },
+                            );
+                        }
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+            if (!matched) {
+                std.debug.warn("[Tui] Unimplemented API: {}\n", .{api_name});
+            }
+        }
+    }
+
     pub fn tick(self: *Self) !bool {
         while (self.rpc.get_event()) |event| {
             defer self.rpc.release(event);
@@ -411,78 +483,18 @@ pub const Tui = struct {
 
             // Methods are called on Ext objects (buffers, windows, etc)
             if (event.Array[2].Array[0] == .Ext) {
-                const target = event.Array[2].Array[0].Ext;
-                if (target.type == 0) { // Buffer
-                    const buf_num = try target.as_u32();
-                    var done = false;
-                    if (self.buffers.get(buf_num)) |buf| {
-                        done = buf.rpc_method(
-                            event.Array[1].RawString,
-                            event.Array[2].Array[1..],
-                        );
-                    } else {
-                        std.debug.warn("Invalid buffer: {}\n", .{buf_num});
-                    }
-                    // Destroy the buffer if requested
-                    if (done) {
-                        if (self.buffers.remove(buf_num)) |buf| {
-                            buf.value.deinit();
-                            self.alloc.destroy(buf.value);
-                        } else {
-                            unreachable;
-                        }
-                    }
-                } else {
-                    std.debug.print("Unknown method target: {}\n", .{target.type});
-                }
+                try self.call_method(event.Array);
             }
             // We attach a few autocommands to rpcnotify(0, 'Fp', ...), which
             // are handled here.
             else if (std.mem.eql(u8, "Fp", event.Array[1].RawString)) {
-                std.debug.print("Fp event:\n   ", .{});
-                for (event.Array) |a| {
-                    std.debug.print("{}", .{a});
-                }
-                std.debug.print("\n    ", .{});
-                for (event.Array[2].Array) |a| {
-                    std.debug.print("{}", .{a});
-                }
-                std.debug.print("\n", .{});
+                try self.call_fp(event.Array);
             }
             // Otherwise, we compare against a list of implemented APIs, by
             // doing a comptime unrolled loop that finds api_XYZ functions
             // and compares against them by name.
             else {
-                // Work around issue #4639 by storing opts in a variable
-                comptime const opts = std.builtin.CallOptions{};
-
-                // For each command in the incoming stream, try to match
-                // it against a local api_XYZ declaration.
-                for (event.Array[2].Array) |cmd| {
-                    var matched = false;
-                    const api_name = cmd.Array[0].RawString;
-                    inline for (@typeInfo(Self).Struct.decls) |s| {
-                        // This conditional should be optimized out, since
-                        // it's known at comptime.
-                        comptime const is_api = std.mem.startsWith(u8, s.name, "api_");
-                        if (is_api) {
-                            if (std.mem.eql(u8, api_name, s.name[4..])) {
-                                for (cmd.Array[1..]) |v| {
-                                    @call(
-                                        opts,
-                                        @field(Self, s.name),
-                                        .{ self, v.Array },
-                                    );
-                                }
-                                matched = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (!matched) {
-                        std.debug.warn("[Tui] Unimplemented API: {}\n", .{api_name});
-                    }
-                }
+                try self.call_api(event.Array);
             }
         }
 

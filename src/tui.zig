@@ -5,6 +5,7 @@ const ft = @import("ft.zig");
 const msgpack = @import("msgpack.zig");
 
 const Buffer = @import("buffer.zig").Buffer;
+const Debounce = @import("debounce.zig").Debounce(u32, 500);
 const Renderer = @import("renderer.zig").Renderer;
 const RPC = @import("rpc.zig").RPC;
 const Window = @import("window.zig").Window;
@@ -28,6 +29,7 @@ pub const Tui = struct {
     font: ft.Atlas,
 
     buffers: std.AutoHashMap(u32, *Buffer),
+    debounce: Debounce,
 
     char_grid: [512 * 512]u32,
     x_tiles: u32,
@@ -113,6 +115,7 @@ pub const Tui = struct {
             .font = font,
 
             .buffers = std.AutoHashMap(u32, *Buffer).init(alloc),
+            .debounce = Debounce.init(),
 
             .char_grid = undefined,
             .x_tiles = 0,
@@ -410,7 +413,9 @@ pub const Tui = struct {
                 const name = event[1].RawString;
                 const args = event[2].Array[1..];
                 switch (buf.rpc_method(name, args)) {
-                    .Changed => {},
+                    .Changed => {
+                        try self.debounce.update(buf_num);
+                    },
                     .Done => {
                         buf.deinit();
                         self.alloc.destroy(buf);
@@ -500,6 +505,11 @@ pub const Tui = struct {
             self.renderer.update_uniforms(&self.u);
         }
         self.renderer.redraw(self.total_tiles);
+
+        if (self.debounce.check()) |buf| {
+            std.debug.print("Buffer {} changed\n", .{buf});
+        }
+
         return true;
     }
 

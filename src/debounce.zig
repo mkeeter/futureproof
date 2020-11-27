@@ -2,6 +2,9 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
+// The Debounce struct is triggered with update(T).  After dt_ms milliseconds,
+// a call to check() returns T.  Intermediate calls to update() will restart
+// the timer and change the value which will eventually be returned by check().
 pub fn Debounce(comptime T: type, dt_ms: i64) type {
     return struct {
         const Self = @This();

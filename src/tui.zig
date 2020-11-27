@@ -513,7 +513,11 @@ pub const Tui = struct {
                 defer self.alloc.free(s);
                 std.debug.print("Buffer {} changed:\n{}\n", .{ buf_num, s });
                 const out = shaderc.build_shader(self.alloc, "preview", s);
-                std.debug.print("Got output {}\n", .{out});
+                if (out) |spirv| {
+                    self.alloc.free(spirv);
+                } else |err| {
+                    std.debug.print("Got err {}\n", .{err});
+                }
             }
         }
 

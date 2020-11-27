@@ -29,6 +29,22 @@ pub const Buffer = struct {
         self.alloc.free(self.lines);
     }
 
+    pub fn to_buf(self: *Buffer) ![]const u8 {
+        var total_length: usize = 0;
+        for (self.lines) |line| {
+            total_length += line.len + 1;
+        }
+        var out = try self.alloc.alloc(u8, total_length);
+
+        var pos: usize = 0;
+        for (self.lines) |line| {
+            std.mem.copy(u8, out[pos..(pos + line.len)], line);
+            out[pos + line.len] = '\n';
+            pos += line.len + 1;
+        }
+        return out;
+    }
+
     fn resize_lines_to(self: *Buffer, count: u64) !void {
         std.debug.assert(count > self.lines.len);
         const new_lines = try self.alloc.alloc([]const u8, count);

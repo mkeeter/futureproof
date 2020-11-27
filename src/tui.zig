@@ -506,8 +506,12 @@ pub const Tui = struct {
         }
         self.renderer.redraw(self.total_tiles);
 
-        if (self.debounce.check()) |buf| {
-            std.debug.print("Buffer {} changed\n", .{buf});
+        if (self.debounce.check()) |buf_num| {
+            if (self.buffers.get(buf_num)) |buf| {
+                const s = try buf.to_buf();
+                std.debug.print("Buffer {} changed:\n{}\n", .{ buf_num, s });
+                self.alloc.free(s);
+            }
         }
 
         return true;

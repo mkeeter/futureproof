@@ -3,6 +3,7 @@ const std = @import("std");
 const c = @import("c.zig");
 const ft = @import("ft.zig");
 const msgpack = @import("msgpack.zig");
+const shaderc = @import("shaderc.zig");
 
 const Buffer = @import("buffer.zig").Buffer;
 const Debounce = @import("debounce.zig").Debounce(u32, 500);
@@ -63,7 +64,7 @@ pub const Tui = struct {
     fn attach_buffer(self: *Self, id: u32) !void {
         var options = msgpack.KeyValueMap.init(self.alloc);
         defer options.deinit();
-        const reply = try self.rpc.call("nvim_buf_attach", .{ id, false, options });
+        const reply = try self.rpc.call("nvim_buf_attach", .{ id, true, options });
         defer self.rpc.release(reply);
 
         // Create a buffer on the heap and store it in the hash map.
@@ -412,7 +413,7 @@ pub const Tui = struct {
             if (self.buffers.get(buf_num)) |buf| {
                 const name = event[1].RawString;
                 const args = event[2].Array[1..];
-                switch (buf.rpc_method(name, args)) {
+                switch (try buf.rpc_method(name, args)) {
                     .Changed => {
                         try self.debounce.update(buf_num);
                     },
@@ -509,8 +510,10 @@ pub const Tui = struct {
         if (self.debounce.check()) |buf_num| {
             if (self.buffers.get(buf_num)) |buf| {
                 const s = try buf.to_buf();
+                defer self.alloc.free(s);
                 std.debug.print("Buffer {} changed:\n{}\n", .{ buf_num, s });
-                self.alloc.free(s);
+                const out = shaderc.build_shader(self.alloc, "preview", s);
+                std.debug.print("Got output {}\n", .{out});
             }
         }
 

@@ -1,5 +1,7 @@
 const std = @import("std");
+
 const c = @import("c.zig");
+const file_contents = @import("util.zig").file_contents;
 
 // TODO: calculate this whole error and function below at comptime
 const CompilationError = error{
@@ -78,24 +80,6 @@ export fn include_release_cb(user_data: ?*c_void, include_result: ?*c.shaderc_in
             alloc.destroy(r.*.content);
         }
         alloc.destroy(r);
-    }
-}
-
-// Returns the file contents, loaded from the file in debug builds and
-// compiled in with release builds.  alloc must be an arena allocator,
-// because otherwise there will be a leak.
-fn file_contents(alloc: *std.mem.Allocator, comptime name: []const u8) ![]u8 {
-    switch (std.builtin.mode) {
-        .Debug => {
-            const file = try std.fs.cwd().openFile(name, std.fs.File.OpenFlags{ .read = true });
-            const size = try file.getEndPos();
-            const buf = try alloc.alloc(u8, size);
-            _ = try file.readAll(buf);
-            return buf;
-        },
-        .ReleaseSafe, .ReleaseFast, .ReleaseSmall => {
-            return @embedFile(name);
-        },
     }
 }
 

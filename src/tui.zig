@@ -432,16 +432,32 @@ pub const Tui = struct {
         }
     }
 
+    fn fp_buf_new(self: *Self, args: []const msgpack.Value) !void {
+        try self.attach_buffer(@intCast(u32, args[0].UInt));
+    }
+
     fn call_fp(self: *Self, event: []const msgpack.Value) !void {
-        std.debug.print("Fp event:\n   ", .{});
-        for (event) |a| {
-            std.debug.print("{}", .{a});
+        const args_ = event[2].Array;
+        const name = args_[0].RawString;
+        const args = args_[1..];
+
+        // Work around issue #4639 by storing opts in a variable
+        comptime const opts = std.builtin.CallOptions{};
+
+        inline for (@typeInfo(Self).Struct.decls) |s| {
+            // Same trick as call_api
+            comptime const is_fp = std.mem.startsWith(u8, s.name, "fp_");
+            if (is_fp) {
+                if (std.mem.eql(u8, name, s.name[3..])) {
+                    return @call(
+                        opts,
+                        @field(Self, s.name),
+                        .{ self, args },
+                    );
+                }
+            }
         }
-        std.debug.print("\n    ", .{});
-        for (event[2].Array) |a| {
-            std.debug.print("{}", .{a});
-        }
-        std.debug.print("\n", .{});
+        std.debug.warn("[Tui] Unknown Fp event: {}\n", .{name});
     }
 
     fn call_api(self: *Self, event: []const msgpack.Value) !void {

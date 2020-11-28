@@ -146,6 +146,12 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) Result {
     defer c.shaderc_compiler_release(compiler);
 
     const options = c.shaderc_compile_options_initialize();
+    c.shaderc_compile_options_set_include_callbacks(
+        options,
+        include_cb,
+        include_release_cb,
+        alloc,
+    );
 
     const result = c.shaderc_compile_into_spv(
         compiler,

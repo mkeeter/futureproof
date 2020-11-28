@@ -12,6 +12,7 @@ pub usingnamespace @cImport({
     @cInclude("shaderc/shaderc.h");
 
     @cInclude("futureproof.h");
+    @cInclude("preview.h");
 
     if (builtin.os.tag == .macos) {
         @cInclude("objc/message.h");

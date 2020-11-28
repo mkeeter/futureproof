@@ -139,7 +139,7 @@ pub const Value = union(enum) {
                         } else {
                             const out = try alloc.alloc(Value, v.len);
                             var i: u32 = 0;
-                            while (i < ptr.len) : (i += 1) {
+                            while (i < v.len) : (i += 1) {
                                 out[i] = try encode(alloc, v[i]);
                             }
                             return Value{ .Array = out };

@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const c = @import("c.zig");
-const file_contents = @import("util.zig").file_contents;
+const util = @import("util.zig");
 
 // TODO: calculate this whole error and function below at comptime
 const CompilationError = error{
@@ -84,7 +84,7 @@ export fn include_release_cb(user_data: ?*c_void, include_result: ?*c.shaderc_in
 }
 
 pub fn build_shader_from_file(alloc: *std.mem.Allocator, comptime name: []const u8) ![]u32 {
-    const buf = try file_contents(alloc, name);
+    const buf = try util.file_contents(alloc, name);
     return build_shader(alloc, name, buf);
 }
 
@@ -153,7 +153,10 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) !Result 
     var arena = std.heap.ArenaAllocator.init(alloc);
     var tmp_alloc: *std.mem.Allocator = &arena.allocator;
     defer arena.deinit();
-    const prelude = try file_contents(tmp_alloc, "shaders/preview.prelude.frag");
+    const prelude = try util.file_contents(
+        tmp_alloc,
+        "shaders/preview.prelude.frag",
+    );
 
     const full_src = try tmp_alloc.alloc(u8, prelude.len + src.len);
     std.mem.copy(u8, full_src, prelude);

@@ -4,6 +4,7 @@ const c = @import("c.zig");
 const ft = @import("ft.zig");
 const msgpack = @import("msgpack.zig");
 const shaderc = @import("shaderc.zig");
+const util = @import("util.zig");
 
 const Buffer = @import("buffer.zig").Buffer;
 const Debounce = @import("debounce.zig").Debounce(u32, 200);
@@ -149,8 +150,7 @@ pub const Tui = struct {
             @ptrCast(?*c_void, out),
         );
 
-        // Attach the UI via RPC
-        {
+        { // Attach the UI via RPC
             var options = msgpack.KeyValueMap.init(alloc);
             try options.put(
                 msgpack.Key{ .RawString = "ext_linegrid" },
@@ -170,6 +170,42 @@ pub const Tui = struct {
 
         // Attach to events from the first buffer
         try out.attach_buffer(1);
+
+        { // Send the template text to the first buffer
+            const src = try util.file_contents(
+                tmp_alloc,
+                "shaders/preview.template.frag",
+            );
+            var line_count: u32 = 1;
+            for (src[0..(src.len - 2)]) |char| {
+                if (char == '\n') {
+                    line_count += 1;
+                }
+            }
+            var lines = try tmp_alloc.alloc([]const u8, line_count);
+            var start: usize = 0;
+            var i: u32 = 0;
+            while (std.mem.indexOf(u8, src[start..], "\n")) |end| {
+                lines[i] = src[start..(start + end)];
+                i += 1;
+                start += end + 1;
+            }
+
+            // Encode the lines manually, as encoding nested structs
+            // doesn't work right now (TODO).
+            const encoded = try msgpack.Value.encode(tmp_alloc, lines);
+            const reply = try rpc.call(
+                "nvim_buf_set_lines",
+                .{ 0, 0, 0, false, encoded },
+            );
+            defer rpc.release(reply);
+        }
+
+        // Clean up and set the filetype
+        rpc.release(try rpc.call(
+            "nvim_input",
+            .{"ddgg:set filetype=glsl<Enter>"},
+        ));
 
         out.update_size(width, height);
 
@@ -780,10 +816,7 @@ pub const Tui = struct {
         }
 
         if (str) |s| {
-            const bin = msgpack.Value{ .RawString = s };
-            var bin_arr = [1]msgpack.Value{bin};
-            const arr = msgpack.Value{ .Array = &bin_arr };
-            const reply = self.rpc.call("nvim_input", arr) catch |err| {
+            const reply = self.rpc.call("nvim_input", .{s}) catch |err| {
                 std.debug.panic("Failed to call nvim_input: {}", .{err});
             };
             defer self.rpc.release(reply);

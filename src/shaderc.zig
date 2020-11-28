@@ -81,12 +81,26 @@ export fn include_release_cb(user_data: ?*c_void, include_result: ?*c.shaderc_in
     }
 }
 
+// Returns the file contents, loaded from the file in debug builds and
+// compiled in with release builds.  alloc must be an arena allocator,
+// because otherwise there will be a leak.
+fn file_contents(alloc: *std.mem.Allocator, comptime name: []const u8) ![]u8 {
+    switch (std.builtin.mode) {
+        .Debug => {
+            const file = try std.fs.cwd().openFile(name, std.fs.File.OpenFlags{ .read = true });
+            const size = try file.getEndPos();
+            const buf = try alloc.alloc(u8, size);
+            _ = try file.readAll(buf);
+            return buf;
+        },
+        .ReleaseSafe, .ReleaseFast, .ReleaseSmall => {
+            return @embedFile(name);
+        },
+    }
+}
+
 pub fn build_shader_from_file(alloc: *std.mem.Allocator, comptime name: []const u8) ![]u32 {
-    const file = try std.fs.cwd().openFile(name, std.fs.File.OpenFlags{ .read = true });
-    const size = try file.getEndPos();
-    const buf = try alloc.alloc(u8, size);
-    defer alloc.free(buf);
-    _ = try file.readAll(buf);
+    const buf = try file_contents(alloc, name);
     return build_shader(alloc, name, buf);
 }
 
@@ -149,6 +163,13 @@ pub const Result = union(enum) {
 pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) Result {
     const compiler = c.shaderc_compiler_initialize();
     defer c.shaderc_compiler_release(compiler);
+
+    // Load the standard fragment shader prelude from a file
+    // (or embed in the source if this is a release build)
+    var arena = std.heap.ArenaAllocator.init(alloc);
+    var tmp_alloc: *std.mem.Allocator = &arena.allocator;
+    defer arena.deinit();
+    const prelude = file_contents(tmp_alloc, "shaders/preview.frag");
 
     const options = c.shaderc_compile_options_initialize();
     c.shaderc_compile_options_set_include_callbacks(

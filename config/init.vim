@@ -28,6 +28,9 @@ map <C-k> <C-W>k
 map <C-h> <C-W>h
 map <C-l> <C-W>l
 
+" Yank to and put from system clipboard
+set clipboard=unnamed
+
 " ------------------------------------------------------------------------------
 augroup fp
   autocmd!

@@ -169,7 +169,7 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) !Result 
     var arena = std.heap.ArenaAllocator.init(alloc);
     var tmp_alloc: *std.mem.Allocator = &arena.allocator;
     defer arena.deinit();
-    const prelude = try file_contents(tmp_alloc, "shaders/preview.frag");
+    const prelude = try file_contents(tmp_alloc, "shaders/preview.prelude.frag");
 
     const full_src = try tmp_alloc.alloc(u8, prelude.len + src.len);
     std.mem.copy(u8, full_src, prelude);

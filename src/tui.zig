@@ -736,7 +736,7 @@ pub const Tui = struct {
         if ((mods & c.GLFW_MOD_ALT) != 0) {
             out = try std.fmt.allocPrint(alloc, "A-{}", .{out});
         }
-        if ((mods & c.GLFW_MOD_ALT) != 0) {
+        if ((mods & c.GLFW_MOD_SUPER) != 0) {
             out = try std.fmt.allocPrint(alloc, "D-{}", .{out});
         }
         return out;

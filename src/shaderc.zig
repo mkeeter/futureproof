@@ -129,13 +129,18 @@ pub const Error = struct {
     msg: []const u8,
     code: c.shaderc_compilation_status,
 };
+pub const Okay = struct {
+    spirv: []const u32,
+    has_iTime: bool,
+};
+
 pub const Result = union(enum) {
-    Shader: []const u32,
+    Shader: Okay,
     Error: Error,
 
     pub fn deinit(self: Result, alloc: *std.mem.Allocator) void {
         switch (self) {
-            .Shader => |d| alloc.free(d),
+            .Shader => |d| alloc.free(d.spirv),
             .Error => |e| alloc.free(e.msg),
         }
     }
@@ -201,6 +206,13 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) Result {
         std.debug.assert(len % 4 == 0);
         const out = alloc.alloc(u32, len / 4) catch unreachable;
         @memcpy(@ptrCast([*]u8, out.ptr), c.shaderc_result_get_bytes(result), len);
-        return Result{ .Shader = out };
+
+        const has_iTime = std.mem.indexOf(u8, src, "iTime") != null;
+        return Result{
+            .Shader = .{
+                .spirv = out,
+                .has_iTime = has_iTime,
+            },
+        };
     }
 }

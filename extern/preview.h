@@ -13,10 +13,7 @@ typedef struct {
 #define FP_PREVIEW_UNIFORMS \
     vec3 iResolution; \
     float iTime; \
-    float iTimeDelta; \
-    float iFrame; \
     vec4 iMouse; \
-    vec4 iDate; \
 
 struct fpPreviewUniforms {
     FP_PREVIEW_UNIFORMS

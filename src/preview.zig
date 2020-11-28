@@ -9,7 +9,11 @@ pub const Preview = struct {
     bind_group: c.WGPUBindGroupId,
     render_pipeline: c.WGPURenderPipelineId,
 
-    pub fn init(alloc: *std.mem.Allocator, device: c.WGPUDeviceId) !Preview {
+    pub fn init(
+        alloc: *std.mem.Allocator,
+        device: c.WGPUDeviceId,
+        frag: []const u32,
+    ) !Preview {
         var arena = std.heap.ArenaAllocator.init(alloc);
         const tmp_alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
@@ -25,16 +29,15 @@ pub const Preview = struct {
                 .length = vert_spv.len,
             },
         );
-        const frag_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/preview.frag") catch |err| {
-            std.debug.panic("Could not open file", .{});
-        };
+        defer c.wgpu_shader_module_destroy(vert_shader);
         const frag_shader = c.wgpu_device_create_shader_module(
             device,
             (c.WGPUShaderSource){
-                .bytes = frag_spv.ptr,
-                .length = frag_spv.len,
+                .bytes = frag.ptr,
+                .length = frag.len,
             },
         );
+        defer c.wgpu_shader_module_destroy(frag_shader);
 
         ////////////////////////////////////////////////////////////////////////////////
         const bind_group_layout = c.wgpu_device_create_bind_group_layout(
@@ -120,13 +123,13 @@ pub const Preview = struct {
         };
     }
 
-    pub fn deinit(self: *Self) void {
+    pub fn deinit(self: *const Self) void {
         c.wgpu_bind_group_destroy(self.bind_group);
         c.wgpu_render_pipeline_destroy(self.render_pipeline);
     }
 
     pub fn redraw(
-        self: *Self,
+        self: *const Self,
         next_texture: c.WGPUSwapChainOutput,
         cmd_encoder: c.WGPUCommandEncoderId,
     ) void {

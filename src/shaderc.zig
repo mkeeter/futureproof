@@ -166,6 +166,8 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) Result {
         const out = alloc.alloc(u8, len) catch unreachable;
         @memcpy(out.ptr, err_msg, len);
 
+        // Prase out individual lines of the error message, figuring out
+        // which ones have a line number attached.
         var start: usize = 0;
         while (std.mem.indexOf(u8, out[start..], "\n")) |end| {
             const line = out[start..(start + end)];

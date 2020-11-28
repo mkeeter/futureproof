@@ -6,7 +6,7 @@ const msgpack = @import("msgpack.zig");
 const shaderc = @import("shaderc.zig");
 
 const Buffer = @import("buffer.zig").Buffer;
-const Debounce = @import("debounce.zig").Debounce(u32, 500);
+const Debounce = @import("debounce.zig").Debounce(u32, 200);
 const Renderer = @import("renderer.zig").Renderer;
 const RPC = @import("rpc.zig").RPC;
 const Window = @import("window.zig").Window;
@@ -505,9 +505,11 @@ pub const Tui = struct {
             self.uniforms_changed = false;
             self.renderer.update_uniforms(&self.u);
         }
-        self.renderer.redraw(self.total_tiles);
 
         if (self.debounce.check()) |buf_num| {
+            // Check that the target buffer hasn't been deleted during the
+            // debouncing delay time.  If it exists, then try to compile
+            // it as a shader and load it into the preview pane.
             if (self.buffers.get(buf_num)) |buf| {
                 const shader_text = try buf.to_buf();
                 defer self.alloc.free(shader_text);
@@ -516,11 +518,15 @@ pub const Tui = struct {
                 defer out.deinit(self.alloc);
 
                 switch (out) {
-                    .Shader => |s| std.debug.print("Got shader of len {}\n", .{s.len}),
+                    .Shader => |s| {
+                        try self.renderer.update_preview(self.alloc, s);
+                    },
                     .Error => |e| std.debug.print("Got error {s}\n", .{e.msg}),
                 }
             }
         }
+
+        self.renderer.redraw(self.total_tiles);
 
         return true;
     }

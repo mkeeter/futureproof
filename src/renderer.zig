@@ -27,7 +27,7 @@ pub const Renderer = struct {
 
     render_pipeline: c.WGPURenderPipelineId,
 
-    preview: Preview,
+    preview: ?Preview,
 
     pub fn init(alloc: *std.mem.Allocator, window: *c.GLFWwindow, font: *const ft.Atlas) !Self {
         var arena = std.heap.ArenaAllocator.init(alloc);
@@ -106,6 +106,7 @@ pub const Renderer = struct {
                 .length = vert_spv.len,
             },
         );
+        defer c.wgpu_shader_module_destroy(vert_shader);
 
         const frag_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/grid.frag") catch |err| {
             std.debug.panic("Could not open file", .{});
@@ -117,6 +118,7 @@ pub const Renderer = struct {
                 .length = frag_spv.len,
             },
         );
+        defer c.wgpu_shader_module_destroy(frag_shader);
 
         ////////////////////////////////////////////////////////////////////////////
         // Upload the font atlas texture
@@ -366,11 +368,22 @@ pub const Renderer = struct {
 
             .render_pipeline = render_pipeline,
 
-            .preview = try Preview.init(alloc, device),
+            .preview = null,
         };
 
         out.update_font_tex(font);
         return out;
+    }
+
+    pub fn update_preview(
+        self: *Self,
+        alloc: *std.mem.Allocator,
+        frag_spv: []const u32,
+    ) !void {
+        if (self.preview) |p| {
+            p.deinit();
+        }
+        self.preview = try Preview.init(alloc, self.device, frag_spv);
     }
 
     pub fn update_font_tex(self: *Self, font: *const ft.Atlas) void {
@@ -440,7 +453,9 @@ pub const Renderer = struct {
         c.wgpu_render_pass_draw(rpass, total_tiles * 6, 1, 0, 0);
         c.wgpu_render_pass_end_pass(rpass);
 
-        self.preview.redraw(next_texture, cmd_encoder);
+        if (self.preview) |p| {
+            p.redraw(next_texture, cmd_encoder);
+        }
 
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);
         c.wgpu_queue_submit(self.queue, &cmd_buf, 1);

@@ -122,3 +122,77 @@ pub fn build_shader(alloc: *std.mem.Allocator, name: []const u8, src: []const u8
 
     return out;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+pub const Error = struct {
+    msg: []const u8,
+    code: c.shaderc_compilation_status,
+};
+pub const Result = union(enum) {
+    Shader: []const u32,
+    Error: Error,
+
+    pub fn deinit(self: Result, alloc: *std.mem.Allocator) void {
+        switch (self) {
+            .Shader => |d| alloc.free(d),
+            .Error => |e| alloc.free(e.msg),
+        }
+    }
+};
+
+pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) Result {
+    const compiler = c.shaderc_compiler_initialize();
+    defer c.shaderc_compiler_release(compiler);
+
+    const options = c.shaderc_compile_options_initialize();
+
+    const result = c.shaderc_compile_into_spv(
+        compiler,
+        src.ptr,
+        src.len,
+        c.shaderc_shader_kind.shaderc_glsl_fragment_shader,
+        "preview",
+        "main",
+        options,
+    );
+    defer c.shaderc_result_release(result);
+
+    const r = c.shaderc_result_get_compilation_status(result);
+    if (@enumToInt(r) != c.shaderc_compilation_status_success) {
+        // Copy the error out of the shader
+        const err_msg = c.shaderc_result_get_error_message(result);
+        const len = std.mem.len(err_msg);
+        const out = alloc.alloc(u8, len) catch unreachable;
+        @memcpy(out.ptr, err_msg, len);
+
+        var start: usize = 0;
+        while (std.mem.indexOf(u8, out[start..], "\n")) |end| {
+            const line = out[start..(start + end)];
+            start += end + 1;
+
+            const num_start = std.mem.indexOf(u8, line, ":") orelse std.debug.panic("Could not find ':' in error message", .{});
+            const num_end = num_start + 1 + (std.mem.indexOf(u8, line[(num_start + 1)..], " ") orelse std.debug.panic("Could not find ':' in error message", .{}));
+
+            if (num_end >= num_start + 2) {
+                // Error message with line attached
+                std.debug.print("{s}: {}\n", .{
+                    line[(num_start + 1)..(num_end - 1)],
+                    line[(num_end + 1)..],
+                });
+            } else {
+                std.debug.print("{s}\n", .{line[(num_start + 2)..]});
+            }
+        }
+
+        //std.fmt.parseInt
+        return Result{ .Error = .{ .msg = out, .code = r } };
+    } else {
+        // Copy the result out of the shader
+        const len = c.shaderc_result_get_length(result);
+        std.debug.assert(len % 4 == 0);
+        const out = alloc.alloc(u32, len / 4) catch unreachable;
+        @memcpy(@ptrCast([*]u8, out.ptr), c.shaderc_result_get_bytes(result), len);
+        return Result{ .Shader = out };
+    }
+}

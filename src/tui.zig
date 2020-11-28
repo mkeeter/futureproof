@@ -509,14 +509,15 @@ pub const Tui = struct {
 
         if (self.debounce.check()) |buf_num| {
             if (self.buffers.get(buf_num)) |buf| {
-                const s = try buf.to_buf();
-                defer self.alloc.free(s);
-                std.debug.print("Buffer {} changed:\n{}\n", .{ buf_num, s });
-                const out = shaderc.build_shader(self.alloc, "preview", s);
-                if (out) |spirv| {
-                    self.alloc.free(spirv);
-                } else |err| {
-                    std.debug.print("Got err {}\n", .{err});
+                const shader_text = try buf.to_buf();
+                defer self.alloc.free(shader_text);
+
+                const out = shaderc.build_preview_shader(self.alloc, shader_text);
+                defer out.deinit(self.alloc);
+
+                switch (out) {
+                    .Shader => |s| std.debug.print("Got shader of len {}\n", .{s.len}),
+                    .Error => |e| std.debug.print("Got error {s}\n", .{e.msg}),
                 }
             }
         }

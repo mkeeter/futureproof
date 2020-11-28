@@ -160,7 +160,7 @@ pub const Result = union(enum) {
     }
 };
 
-pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) Result {
+pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) !Result {
     const compiler = c.shaderc_compiler_initialize();
     defer c.shaderc_compiler_release(compiler);
 
@@ -169,7 +169,11 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) Result {
     var arena = std.heap.ArenaAllocator.init(alloc);
     var tmp_alloc: *std.mem.Allocator = &arena.allocator;
     defer arena.deinit();
-    const prelude = file_contents(tmp_alloc, "shaders/preview.frag");
+    const prelude = try file_contents(tmp_alloc, "shaders/preview.frag");
+
+    const full_src = try tmp_alloc.alloc(u8, prelude.len + src.len);
+    std.mem.copy(u8, full_src, prelude);
+    std.mem.copy(u8, full_src[prelude.len..], src);
 
     const options = c.shaderc_compile_options_initialize();
     c.shaderc_compile_options_set_include_callbacks(
@@ -181,8 +185,8 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) Result {
 
     const result = c.shaderc_compile_into_spv(
         compiler,
-        src.ptr,
-        src.len,
+        full_src.ptr,
+        full_src.len,
         c.shaderc_shader_kind.shaderc_glsl_fragment_shader,
         "preview",
         "main",
@@ -195,7 +199,7 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) Result {
         // Copy the error out of the shader
         const err_msg = c.shaderc_result_get_error_message(result);
         const len = std.mem.len(err_msg);
-        const out = alloc.alloc(u8, len) catch unreachable;
+        const out = try alloc.alloc(u8, len);
         @memcpy(out.ptr, err_msg, len);
 
         // Prase out individual lines of the error message, figuring out
@@ -225,7 +229,7 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) Result {
         // Copy the result out of the shader
         const len = c.shaderc_result_get_length(result);
         std.debug.assert(len % 4 == 0);
-        const out = alloc.alloc(u32, len / 4) catch unreachable;
+        const out = try alloc.alloc(u32, len / 4);
         @memcpy(@ptrCast([*]u8, out.ptr), c.shaderc_result_get_bytes(result), len);
 
         const has_iTime = std.mem.indexOf(u8, src, "iTime") != null;

@@ -530,7 +530,7 @@ pub const Tui = struct {
                 const shader_text = try buf.to_buf();
                 defer self.alloc.free(shader_text);
 
-                const out = shaderc.build_preview_shader(self.alloc, shader_text);
+                const out = try shaderc.build_preview_shader(self.alloc, shader_text);
                 defer out.deinit(self.alloc);
 
                 switch (out) {

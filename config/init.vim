@@ -22,6 +22,12 @@ set list listchars=tab:\ \ ,trail:·
 set nowrap " Don't wrap lines by default
 set linebreak " When wrapping, break at convenient points
 
+" Switching between buffers
+map <C-j> <C-W>j
+map <C-k> <C-W>k
+map <C-h> <C-W>h
+map <C-l> <C-W>l
+
 " ------------------------------------------------------------------------------
 augroup fp
   autocmd!

@@ -20,6 +20,10 @@ pub const Window = struct {
         }
     }
 
+    pub fn deinit(self: *Self) void {
+        c.glfwDestroyWindow(self.window);
+    }
+
     pub fn should_close(self: *Self) bool {
         return c.glfwWindowShouldClose(self.window) != 0;
     }

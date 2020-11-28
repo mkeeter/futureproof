@@ -50,6 +50,8 @@ pub const Tui = struct {
     pub fn deinit(self: *Self) void {
         self.rpc.deinit();
         self.font.deinit();
+        self.window.deinit();
+        self.renderer.deinit(self.alloc);
 
         var itr = self.buffers.iterator();
         while (itr.next()) |buf| {

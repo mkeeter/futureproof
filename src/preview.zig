@@ -13,6 +13,7 @@ pub const Preview = struct {
     render_pipeline: c.WGPURenderPipelineId,
 
     start_time: i64,
+    uniforms: c.fpPreviewUniforms,
 
     pub fn init(
         alloc: *std.mem.Allocator,
@@ -170,6 +171,12 @@ pub const Preview = struct {
             .bind_group = bind_group,
 
             .start_time = start_time,
+
+            .uniforms = .{
+                .iResolution = .{ .x = 0, .y = 0, .z = 0 },
+                .iTime = 0.0,
+                .iMouse = .{ .x = 0, .y = 0, .z = 0, .w = 0 },
+            },
         };
     }
 
@@ -177,6 +184,11 @@ pub const Preview = struct {
         c.wgpu_bind_group_destroy(self.bind_group);
         c.wgpu_buffer_destroy(self.uniform_buffer);
         c.wgpu_render_pipeline_destroy(self.render_pipeline);
+    }
+
+    pub fn set_size(self: *Self, width: u32, height: u32) void {
+        self.uniforms.iResolution.x = @intToFloat(f32, width);
+        self.uniforms.iResolution.y = @intToFloat(f32, height);
     }
 
     pub fn redraw(
@@ -187,11 +199,9 @@ pub const Preview = struct {
         const time_ms = std.time.milliTimestamp() - self.start_time;
         const abs_time = @intToFloat(f32, time_ms) / 1000.0;
 
-        const uniforms = c.fpPreviewUniforms{
-            .iResolution = c.vec3{ .x = 0, .y = 0, .z = 0 },
-            .iTime = abs_time,
-            .iMouse = c.vec4{ .x = 0, .y = 0, .z = 0, .w = 0 },
-        };
+        var uniforms = self.uniforms;
+        uniforms.iTime = abs_time;
+        std.debug.print("{}\n", .{uniforms});
         c.wgpu_queue_write_buffer(
             self.queue,
             self.uniform_buffer,

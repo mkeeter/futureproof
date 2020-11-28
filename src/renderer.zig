@@ -15,6 +15,8 @@ pub const Renderer = struct {
     tex_sampler: c.WGPUSamplerId,
 
     swap_chain: c.WGPUSwapChainId,
+    width: u32,
+    height: u32,
 
     device: c.WGPUDeviceId,
     surface: c.WGPUSurfaceId,
@@ -356,6 +358,8 @@ pub const Renderer = struct {
             .tex_sampler = tex_sampler,
 
             .swap_chain = undefined, // assigned in resize_swap_chain below
+            .width = undefined,
+            .height = undefined,
 
             .device = device,
             .surface = surface,
@@ -384,8 +388,12 @@ pub const Renderer = struct {
             p.deinit();
             alloc.destroy(p);
         }
+
+        // Construct a new Preview with our current state
         var p = try alloc.create(Preview);
         p.* = try Preview.init(alloc, self.device, frag_spv);
+        p.set_size(self.width, self.height);
+
         self.preview = p;
     }
 
@@ -504,6 +512,11 @@ pub const Renderer = struct {
                 .present_mode = c.WGPUPresentMode._Fifo,
             },
         );
+
+        // Track width and height so that we can set them in a Preview
+        // (even if one isn't loaded right now)
+        self.width = width;
+        self.height = height;
         if (self.preview) |p| {
             p.set_size(width, height);
         }

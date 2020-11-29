@@ -12,7 +12,7 @@ const RPC = @import("rpc.zig").RPC;
 const Window = @import("window.zig").Window;
 
 const FONT_NAME = "font/Inconsolata-SemiBold.ttf";
-const FONT_SIZE = 16;
+const FONT_SIZE = 14;
 const SCROLL_THRESHOLD = 0.1;
 
 pub const Tui = struct {
@@ -81,8 +81,8 @@ pub const Tui = struct {
         const tmp_alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
 
-        var width: c_int = 640;
-        var height: c_int = 480;
+        var width: c_int = 900;
+        var height: c_int = 600;
 
         var window = try Window.init(width, height, "futureproof");
         c.glfwGetFramebufferSize(window.window, &width, &height);

@@ -14,11 +14,13 @@ pub const Preview = struct {
 
     start_time: i64,
     uniforms: c.fpPreviewUniforms,
+    draw_continuously: bool,
 
     pub fn init(
         alloc: *std.mem.Allocator,
         device: c.WGPUDeviceId,
         frag: []const u32,
+        draw_continuously: bool,
     ) !Preview {
         var arena = std.heap.ArenaAllocator.init(alloc);
         const tmp_alloc: *std.mem.Allocator = &arena.allocator;
@@ -171,6 +173,7 @@ pub const Preview = struct {
             .bind_group = bind_group,
 
             .start_time = start_time,
+            .draw_continuously = draw_continuously,
 
             .uniforms = .{
                 .iResolution = .{ .x = 0, .y = 0, .z = 0 },

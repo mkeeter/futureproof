@@ -383,6 +383,7 @@ pub const Renderer = struct {
         self: *Self,
         alloc: *std.mem.Allocator,
         frag_spv: []const u32,
+        draw_continuously: bool,
     ) !void {
         if (self.preview) |p| {
             p.deinit();
@@ -391,7 +392,7 @@ pub const Renderer = struct {
 
         // Construct a new Preview with our current state
         var p = try alloc.create(Preview);
-        p.* = try Preview.init(alloc, self.device, frag_spv);
+        p.* = try Preview.init(alloc, self.device, frag_spv, draw_continuously);
         p.set_size(self.width, self.height);
 
         self.preview = p;
@@ -466,6 +467,9 @@ pub const Renderer = struct {
 
         if (self.preview) |p| {
             p.redraw(next_texture, cmd_encoder);
+            if (p.draw_continuously) {
+                c.glfwPostEmptyEvent();
+            }
         }
 
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);

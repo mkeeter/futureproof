@@ -573,7 +573,7 @@ pub const Tui = struct {
 
                 switch (out) {
                     .Shader => |s| {
-                        try self.renderer.update_preview(self.alloc, s.spirv);
+                        try self.renderer.update_preview(self.alloc, s.spirv, s.has_iTime);
                     },
                     .Error => |e| std.debug.print("Got error {s}\n", .{e.msg}),
                 }

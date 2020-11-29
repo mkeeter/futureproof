@@ -389,12 +389,11 @@ pub const Renderer = struct {
         const out = try shaderc.build_preview_shader(alloc, src);
         defer out.deinit(alloc);
 
-        const draw_continuously = std.mem.indexOf(u8, src, "iTime") != null;
-
         switch (out) {
             .Shader => |s| {
                 // Construct a new Preview with our current state
                 var p = try alloc.create(Preview);
+                const draw_continuously = std.mem.indexOf(u8, src, "iTime") != null;
                 p.* = try Preview.init(alloc, self.device, s.spirv, draw_continuously);
                 p.set_size(self.width, self.height);
 

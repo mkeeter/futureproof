@@ -129,7 +129,6 @@ pub const Error = struct {
 };
 pub const Okay = struct {
     spirv: []const u32,
-    has_iTime: bool,
 };
 
 pub const Result = union(enum) {
@@ -219,12 +218,8 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) !Result 
         const out = try alloc.alloc(u32, len / 4);
         @memcpy(@ptrCast([*]u8, out.ptr), c.shaderc_result_get_bytes(result), len);
 
-        const has_iTime = std.mem.indexOf(u8, src, "iTime") != null;
         return Result{
-            .Shader = .{
-                .spirv = out,
-                .has_iTime = has_iTime,
-            },
+            .Shader = .{ .spirv = out },
         };
     }
 }

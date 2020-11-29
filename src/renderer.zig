@@ -379,23 +379,29 @@ pub const Renderer = struct {
         return out;
     }
 
-    pub fn update_preview(
-        self: *Self,
-        alloc: *std.mem.Allocator,
-        frag_spv: []const u32,
-        draw_continuously: bool,
-    ) !void {
+    pub fn update_preview(self: *Self, alloc: *std.mem.Allocator, src: []const u8) !void {
         if (self.preview) |p| {
             p.deinit();
             alloc.destroy(p);
+            self.preview = null;
         }
 
-        // Construct a new Preview with our current state
-        var p = try alloc.create(Preview);
-        p.* = try Preview.init(alloc, self.device, frag_spv, draw_continuously);
-        p.set_size(self.width, self.height);
+        const out = try shaderc.build_preview_shader(alloc, src);
+        defer out.deinit(alloc);
 
-        self.preview = p;
+        const draw_continuously = std.mem.indexOf(u8, src, "iTime") != null;
+
+        switch (out) {
+            .Shader => |s| {
+                // Construct a new Preview with our current state
+                var p = try alloc.create(Preview);
+                p.* = try Preview.init(alloc, self.device, s.spirv, draw_continuously);
+                p.set_size(self.width, self.height);
+
+                self.preview = p;
+            },
+            .Error => |e| std.debug.print("Got error {s}\n", .{e.msg}),
+        }
     }
 
     pub fn update_font_tex(self: *Self, font: *const ft.Atlas) void {

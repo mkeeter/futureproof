@@ -8,7 +8,7 @@ layout(location=0) out vec4 fragColor_;
 void mainImage(out vec4 fragColor, in vec2 fragCoord);
 void main()  {
     vec4 o;
-    mainImage(o, gl_FragCoord.xy);
+    mainImage(o, gl_FragCoord.xy - vec2(iResolution.x, 0));
     fragColor_ = o;
 }
 

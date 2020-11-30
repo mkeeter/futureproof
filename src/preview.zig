@@ -190,7 +190,7 @@ pub const Preview = struct {
     }
 
     pub fn set_size(self: *Self, width: u32, height: u32) void {
-        self.uniforms.iResolution.x = @intToFloat(f32, width);
+        self.uniforms.iResolution.x = @intToFloat(f32, width) / 2;
         self.uniforms.iResolution.y = @intToFloat(f32, height);
     }
 
@@ -202,8 +202,10 @@ pub const Preview = struct {
         const time_ms = std.time.milliTimestamp() - self.start_time;
         const abs_time = @intToFloat(f32, time_ms) / 1000.0;
 
+        // Set the time in the uniforms array
         var uniforms = self.uniforms;
         uniforms.iTime = abs_time;
+
         std.debug.print("{}\n", .{uniforms});
         c.wgpu_queue_write_buffer(
             self.queue,

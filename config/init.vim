@@ -34,5 +34,5 @@ set clipboard=unnamed
 " ------------------------------------------------------------------------------
 augroup fp
   autocmd!
-  autocmd BufNew * call rpcnotify(0, 'Fp', 'buf_new', str2nr(expand('<abuf>')))
+  autocmd BufNewFile,BufReadPost * call rpcnotify(0, 'Fp', 'buf_new', str2nr(expand('<abuf>')))
 augroup end

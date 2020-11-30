@@ -206,7 +206,6 @@ pub const Preview = struct {
         var uniforms = self.uniforms;
         uniforms.iTime = abs_time;
 
-        std.debug.print("{}\n", .{uniforms});
         c.wgpu_queue_write_buffer(
             self.queue,
             self.uniform_buffer,

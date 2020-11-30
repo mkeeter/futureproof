@@ -65,7 +65,8 @@ pub const Buffer = struct {
         }
 
         const first = args[1].UInt;
-        const last = args[2].UInt;
+        // Work around buf #13418 in Neovim
+        const last = std.math.min(args[2].UInt, self.lines.len);
         std.debug.assert(last >= first);
 
         const lines = args[3].Array;

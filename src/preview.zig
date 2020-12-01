@@ -6,7 +6,11 @@ const shaderc = @import("shaderc.zig");
 pub const Preview = struct {
     const Self = @This();
 
-    queue: c.WGPUQueueId, // Used to update uniform buffer
+    device: c.WGPUDeviceId,
+    queue: c.WGPUQueueId,
+
+    tex: c.WGPUTextureId,
+    tex_view: c.WGPUTextureViewId,
 
     bind_group: c.WGPUBindGroupId,
     uniform_buffer: c.WGPUBufferId,
@@ -166,6 +170,7 @@ pub const Preview = struct {
 
         const start_time = std.time.milliTimestamp();
         return Self{
+            .device = device,
             .queue = c.wgpu_device_get_default_queue(device),
 
             .render_pipeline = render_pipeline,
@@ -174,6 +179,10 @@ pub const Preview = struct {
 
             .start_time = start_time,
             .draw_continuously = draw_continuously,
+
+            // Assigned in set_size below
+            .tex = undefined,
+            .tex_view = undefined,
 
             .uniforms = .{
                 .iResolution = .{ .x = 0, .y = 0, .z = 0 },
@@ -187,18 +196,66 @@ pub const Preview = struct {
         c.wgpu_bind_group_destroy(self.bind_group);
         c.wgpu_buffer_destroy(self.uniform_buffer);
         c.wgpu_render_pipeline_destroy(self.render_pipeline);
+
+        // If the texture was created, then destroy it
+        if (self.uniforms.iResolution.x != 0) {
+            c.wgpu_texture_destroy(self.tex);
+            c.wgpu_texture_view_destroy(self.tex_view);
+        }
     }
 
     pub fn set_size(self: *Self, width: u32, height: u32) void {
+        // If the texture was created, then destroy it
+        if (self.uniforms.iResolution.x != 0) {
+            c.wgpu_texture_destroy(self.tex);
+            c.wgpu_texture_view_destroy(self.tex_view);
+        }
+
+        const tex_size = (c.WGPUExtent3d){
+            .width = @intCast(u32, width / 2),
+            .height = @intCast(u32, height),
+            .depth = 1,
+        };
+
+        self.tex = c.wgpu_device_create_texture(
+            self.device,
+            &(c.WGPUTextureDescriptor){
+                .size = tex_size,
+                .mip_level_count = 1,
+                .sample_count = 1,
+                .dimension = c.WGPUTextureDimension._D2,
+                .format = c.WGPUTextureFormat._Bgra8Unorm,
+
+                // We'll copy from this texture to the swapchain tex
+                .usage = c.WGPUTextureUsage_COPY_SRC | c.WGPUTextureUsage_OUTPUT_ATTACHMENT,
+                .label = "preview_tex",
+            },
+        );
+
+        self.tex_view = c.wgpu_texture_create_view(
+            self.tex,
+            &(c.WGPUTextureViewDescriptor){
+                .label = "preview_tex_view",
+                .dimension = c.WGPUTextureViewDimension._D2,
+                .format = c.WGPUTextureFormat._Rgba8Unorm,
+                .aspect = c.WGPUTextureAspect._All,
+                .base_mip_level = 0,
+                .level_count = 1,
+                .base_array_layer = 0,
+                .array_layer_count = 1,
+            },
+        );
+
         self.uniforms.iResolution.x = @intToFloat(f32, width) / 2;
         self.uniforms.iResolution.y = @intToFloat(f32, height);
     }
 
-    pub fn redraw(
-        self: *const Self,
-        next_texture: c.WGPUSwapChainOutput,
-        cmd_encoder: c.WGPUCommandEncoderId,
-    ) void {
+    pub fn redraw(self: *const Self) void {
+        const cmd_encoder = c.wgpu_device_create_command_encoder(
+            self.device,
+            &(c.WGPUCommandEncoderDescriptor){ .label = "preview encoder" },
+        );
+
         const time_ms = std.time.milliTimestamp() - self.start_time;
         const abs_time = @intToFloat(f32, time_ms) / 1000.0;
 
@@ -216,7 +273,7 @@ pub const Preview = struct {
 
         const color_attachments = [_]c.WGPURenderPassColorAttachmentDescriptor{
             (c.WGPURenderPassColorAttachmentDescriptor){
-                .attachment = next_texture.view_id,
+                .attachment = self.tex_view,
                 .resolve_target = 0,
                 .channel = (c.WGPUPassChannel_Color){
                     .load_op = c.WGPULoadOp._Load,
@@ -240,5 +297,8 @@ pub const Preview = struct {
         c.wgpu_render_pass_set_bind_group(rpass, 0, self.bind_group, null, 0);
         c.wgpu_render_pass_draw(rpass, 3, 1, 0, 0);
         c.wgpu_render_pass_end_pass(rpass);
+
+        const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);
+        c.wgpu_queue_submit(self.queue, &cmd_buf, 1);
     }
 };

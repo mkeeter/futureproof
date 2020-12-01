@@ -435,7 +435,7 @@ pub const Renderer = struct {
 
         const cmd_encoder = c.wgpu_device_create_command_encoder(
             self.device,
-            &(c.WGPUCommandEncoderDescriptor){ .label = "command encoder" },
+            &(c.WGPUCommandEncoderDescriptor){ .label = "main encoder" },
         );
 
         const color_attachments = [_]c.WGPURenderPassColorAttachmentDescriptor{
@@ -470,8 +470,15 @@ pub const Renderer = struct {
         c.wgpu_render_pass_draw(rpass, total_tiles * 6, 1, 0, 0);
         c.wgpu_render_pass_end_pass(rpass);
 
+        // Render the preview to its internal texture, then blit from that
+        // texture to the main swap chain if we're all ready
         if (self.preview) |p| {
-            p.redraw(next_texture, cmd_encoder);
+            p.redraw();
+            // We can't use wgpu_command_encoder_copy_texture_to_texture
+            // here, because the next_texture exposes a view rather than
+            // the internal texture.
+
+            // TODO: figure out how to draw from this texture
             if (p.draw_continuously) {
                 c.glfwPostEmptyEvent();
             }

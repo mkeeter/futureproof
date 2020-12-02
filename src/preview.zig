@@ -226,8 +226,11 @@ pub const Preview = struct {
                 .dimension = c.WGPUTextureDimension._D2,
                 .format = c.WGPUTextureFormat._Bgra8Unorm,
 
-                // We'll copy from this texture to the swapchain tex
-                .usage = c.WGPUTextureUsage_COPY_SRC | c.WGPUTextureUsage_OUTPUT_ATTACHMENT,
+                // We render to this texture, then use it as a source when
+                // blitting into the final UI image
+                .usage = 0 |
+                    c.WGPUTextureUsage_OUTPUT_ATTACHMENT |
+                    c.WGPUTextureUsage_SAMPLED,
                 .label = "preview_tex",
             },
         );
@@ -276,9 +279,14 @@ pub const Preview = struct {
                 .attachment = self.tex_view,
                 .resolve_target = 0,
                 .channel = (c.WGPUPassChannel_Color){
-                    .load_op = c.WGPULoadOp._Load,
+                    .load_op = c.WGPULoadOp._Clear,
                     .store_op = c.WGPUStoreOp._Store,
-                    .clear_value = undefined,
+                    .clear_value = (c.WGPUColor){
+                        .r = 0.0,
+                        .g = 0.0,
+                        .b = 0.0,
+                        .a = 1.0,
+                    },
                     .read_only = false,
                 },
             },

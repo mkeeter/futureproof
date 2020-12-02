@@ -6,6 +6,7 @@ const shaderc = @import("shaderc.zig");
 const ft = @import("ft.zig");
 
 const Preview = @import("preview.zig").Preview;
+const Blit = @import("blit.zig").Blit;
 
 pub const Renderer = struct {
     const Self = @This();
@@ -30,6 +31,7 @@ pub const Renderer = struct {
     render_pipeline: c.WGPURenderPipelineId,
 
     preview: ?*Preview,
+    blit: Blit,
 
     pub fn init(alloc: *std.mem.Allocator, window: *c.GLFWwindow, font: *const ft.Atlas) !Self {
         var arena = std.heap.ArenaAllocator.init(alloc);
@@ -373,6 +375,7 @@ pub const Renderer = struct {
             .render_pipeline = render_pipeline,
 
             .preview = null,
+            .blit = try Blit.init(alloc, device),
         };
 
         out.update_font_tex(font);
@@ -398,6 +401,7 @@ pub const Renderer = struct {
                 p.set_size(self.width, self.height);
 
                 self.preview = p;
+                self.blit.bind_to_tex(p.tex_view);
             },
             .Error => |e| std.debug.print("Got error {s}\n", .{e.msg}),
         }
@@ -428,6 +432,19 @@ pub const Renderer = struct {
     }
 
     pub fn redraw(self: *Self, total_tiles: u32) void {
+        const start_ms = std.time.milliTimestamp();
+
+        // Render the preview to its internal texture, then blit from that
+        // texture to the main swap chain.  This lets us render the preview
+        // at a different resolution from the rest of the UI.
+        if (self.preview) |p| {
+            p.redraw();
+            if (p.draw_continuously) {
+                c.glfwPostEmptyEvent();
+            }
+        }
+
+        // Begin the main render operation
         const next_texture = c.wgpu_swap_chain_get_next_texture(self.swap_chain);
         if (next_texture.view_id == 0) {
             std.debug.panic("Cannot acquire next swap chain texture", .{});
@@ -469,24 +486,18 @@ pub const Renderer = struct {
         c.wgpu_render_pass_set_bind_group(rpass, 0, self.bind_group, null, 0);
         c.wgpu_render_pass_draw(rpass, total_tiles * 6, 1, 0, 0);
         c.wgpu_render_pass_end_pass(rpass);
-
-        // Render the preview to its internal texture, then blit from that
-        // texture to the main swap chain if we're all ready
-        if (self.preview) |p| {
-            p.redraw();
-            // We can't use wgpu_command_encoder_copy_texture_to_texture
-            // here, because the next_texture exposes a view rather than
-            // the internal texture.
-
-            // TODO: figure out how to draw from this texture
-            if (p.draw_continuously) {
-                c.glfwPostEmptyEvent();
-            }
+        if (self.preview != null) {
+            self.blit.redraw(next_texture, cmd_encoder);
         }
 
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);
         c.wgpu_queue_submit(self.queue, &cmd_buf, 1);
+
         c.wgpu_swap_chain_present(self.swap_chain);
+
+        const end_ms = std.time.milliTimestamp();
+        // TODO: use framerate to adjust preview resolution
+        std.debug.print("{}\n", .{end_ms - start_ms});
     }
 
     pub fn deinit(self: *Self, alloc: *std.mem.Allocator) void {
@@ -504,6 +515,7 @@ pub const Renderer = struct {
             p.deinit();
             alloc.destroy(p);
         }
+        self.blit.deinit();
     }
 
     pub fn update_grid(self: *Self, char_grid: []u32) void {
@@ -535,6 +547,7 @@ pub const Renderer = struct {
         self.height = height;
         if (self.preview) |p| {
             p.set_size(width, height);
+            self.blit.bind_to_tex(p.tex_view);
         }
     }
 

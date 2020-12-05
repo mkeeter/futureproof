@@ -31,11 +31,5 @@ map <C-l> <C-W>l
 " Yank to and put from system clipboard
 set clipboard=unnamed
 
-" ------------------------------------------------------------------------------
-augroup fp
-  autocmd!
-  autocmd BufNewFile,BufReadPost * call rpcnotify(0, 'Fp', 'buf_new', str2nr(expand('<abuf>')))
-augroup end
-
-sign define fpErr text=>> texthl=Search
-set signcolumn=yes
+" Always show sign column
+set signcolumn=yes:1

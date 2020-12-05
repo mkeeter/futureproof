@@ -578,7 +578,6 @@ pub const Tui = struct {
 
     fn rebuild_preview(self: *Self, buf_num: u32, shader_text: []const u8) !void {
         const out = try shaderc.build_preview_shader(self.alloc, shader_text);
-        std.debug.print("{}\n", .{out});
         defer out.deinit(self.alloc);
 
         { // Clear all of the error markers before compiling the shader
@@ -603,10 +602,8 @@ pub const Tui = struct {
                         },
                     );
                     defer self.alloc.free(cmd);
-                    std.debug.print("Error at line {}\n", .{line_err.line});
 
                     const reply = try self.rpc.call("nvim_command", .{cmd});
-                    std.debug.print("{}\n", .{reply});
                     defer self.rpc.release(reply);
                 }
             },

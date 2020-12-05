@@ -3,6 +3,7 @@ const std = @import("std");
 const c = @import("c.zig");
 const ft = @import("ft.zig");
 const msgpack = @import("msgpack.zig");
+const shaderc = @import("shaderc.zig");
 const util = @import("util.zig");
 
 const Buffer = @import("buffer.zig").Buffer;
@@ -566,13 +567,29 @@ pub const Tui = struct {
             if (self.buffers.get(buf_num)) |buf| {
                 const shader_text = try buf.to_buf();
                 defer self.alloc.free(shader_text);
-                try self.renderer.update_preview(self.alloc, shader_text);
+                try self.rebuild_preview(shader_text);
             }
         }
 
         self.renderer.redraw(self.total_tiles);
 
         return true;
+    }
+
+    fn rebuild_preview(self: *Self, shader_text: []const u8) !void {
+        const out = try shaderc.build_preview_shader(self.alloc, shader_text);
+        std.debug.print("{}\n", .{out});
+        defer out.deinit(self.alloc);
+
+        switch (out) {
+            .Shader => |s| {
+                try self.renderer.update_preview(self.alloc, s);
+            },
+            .Error => |e| {
+                self.renderer.clear_preview(self.alloc);
+                std.debug.print("Got error {s}\n", .{e.errs});
+            },
+        }
     }
 
     pub fn run(self: *Self) !void {

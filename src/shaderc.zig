@@ -123,22 +123,32 @@ pub fn build_shader(alloc: *std.mem.Allocator, name: []const u8, src: []const u8
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub const Error = struct {
+pub const LineErr = struct {
     msg: []const u8,
+    line: ?u32,
+};
+pub const Error = struct {
+    errs: []const LineErr,
     code: c.shaderc_compilation_status,
 };
-pub const Okay = struct {
+pub const Shader = struct {
     spirv: []const u32,
+    has_time: bool,
 };
 
 pub const Result = union(enum) {
-    Shader: Okay,
+    Shader: Shader,
     Error: Error,
 
     pub fn deinit(self: Result, alloc: *std.mem.Allocator) void {
         switch (self) {
             .Shader => |d| alloc.free(d.spirv),
-            .Error => |e| alloc.free(e.msg),
+            .Error => |e| {
+                for (e.errs) |r| {
+                    alloc.free(r.msg);
+                }
+                alloc.free(e.errs);
+            },
         }
     }
 };
@@ -185,32 +195,45 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) !Result 
         // Copy the error out of the shader
         const err_msg = c.shaderc_result_get_error_message(result);
         const len = std.mem.len(err_msg);
-        const out = try alloc.alloc(u8, len);
+        const out = try tmp_alloc.alloc(u8, len);
         @memcpy(out.ptr, err_msg, len);
 
         // Prase out individual lines of the error message, figuring out
         // which ones have a line number attached.
         var start: usize = 0;
+        var errs = std.ArrayList(LineErr).init(alloc);
         while (std.mem.indexOf(u8, out[start..], "\n")) |end| {
             const line = out[start..(start + end)];
             start += end + 1;
 
-            const num_start = std.mem.indexOf(u8, line, ":") orelse std.debug.panic("Could not find ':' in error message", .{});
-            const num_end = num_start + 1 + (std.mem.indexOf(u8, line[(num_start + 1)..], " ") orelse std.debug.panic("Could not find ':' in error message", .{}));
+            const num_start = std.mem.indexOf(u8, line, ":") orelse std.debug.panic(
+                "Could not find ':' in error message",
+                .{},
+            );
+            const num_end = num_start + 1 + (std.mem.indexOf(
+                u8,
+                line[(num_start + 1)..],
+                " ",
+            ) orelse std.debug.panic("Could not find ':' in error message", .{}));
 
             if (num_end >= num_start + 2) {
                 // Error message with line attached
-                std.debug.print("{s}: {}\n", .{
-                    line[(num_start + 1)..(num_end - 1)],
-                    line[(num_end + 1)..],
+                const line_num = try std.fmt.parseInt(u32, line[(num_start + 1)..(num_end - 1)], 10);
+                const line_msg = try alloc.dupe(u8, line[(num_end + 1)..]);
+                try errs.append(.{
+                    .msg = line_msg,
+                    .line = line_num,
                 });
             } else {
-                std.debug.print("{s}\n", .{line[(num_start + 2)..]});
+                const line_msg = try alloc.dupe(u8, line[(num_start + 2)..]);
+                try errs.append(.{
+                    .msg = line_msg,
+                    .line = null,
+                });
             }
         }
 
-        //std.fmt.parseInt
-        return Result{ .Error = .{ .msg = out, .code = r } };
+        return Result{ .Error = .{ .errs = errs.toOwnedSlice(), .code = r } };
     } else {
         // Copy the result out of the shader
         const len = c.shaderc_result_get_length(result);
@@ -218,8 +241,9 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) !Result 
         const out = try alloc.alloc(u32, len / 4);
         @memcpy(@ptrCast([*]u8, out.ptr), c.shaderc_result_get_bytes(result), len);
 
+        const has_time = std.mem.indexOf(u8, src, "iTime") != null;
         return Result{
-            .Shader = .{ .spirv = out },
+            .Shader = .{ .spirv = out, .has_time = has_time },
         };
     }
 }

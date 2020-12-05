@@ -5,8 +5,9 @@ const c = @import("c.zig");
 const shaderc = @import("shaderc.zig");
 const ft = @import("ft.zig");
 
-const Preview = @import("preview.zig").Preview;
 const Blit = @import("blit.zig").Blit;
+const Preview = @import("preview.zig").Preview;
+const Shader = @import("shaderc.zig").Shader;
 
 pub const Renderer = struct {
     const Self = @This();
@@ -382,29 +383,24 @@ pub const Renderer = struct {
         return out;
     }
 
-    pub fn update_preview(self: *Self, alloc: *std.mem.Allocator, src: []const u8) !void {
+    pub fn clear_preview(self: *Self, alloc: *std.mem.Allocator) void {
         if (self.preview) |p| {
             p.deinit();
             alloc.destroy(p);
             self.preview = null;
         }
+    }
 
-        const out = try shaderc.build_preview_shader(alloc, src);
-        defer out.deinit(alloc);
+    pub fn update_preview(self: *Self, alloc: *std.mem.Allocator, s: Shader) !void {
+        self.clear_preview(alloc);
 
-        switch (out) {
-            .Shader => |s| {
-                // Construct a new Preview with our current state
-                var p = try alloc.create(Preview);
-                const draw_continuously = std.mem.indexOf(u8, src, "iTime") != null;
-                p.* = try Preview.init(alloc, self.device, s.spirv, draw_continuously);
-                p.set_size(self.width, self.height);
+        // Construct a new Preview with our current state
+        var p = try alloc.create(Preview);
+        p.* = try Preview.init(alloc, self.device, s.spirv, s.has_time);
+        p.set_size(self.width, self.height);
 
-                self.preview = p;
-                self.blit.bind_to_tex(p.tex_view);
-            },
-            .Error => |e| std.debug.print("Got error {s}\n", .{e.msg}),
-        }
+        self.preview = p;
+        self.blit.bind_to_tex(p.tex_view);
     }
 
     pub fn update_font_tex(self: *Self, font: *const ft.Atlas) void {

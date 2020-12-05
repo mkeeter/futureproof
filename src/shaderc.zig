@@ -192,6 +192,13 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) !Result 
 
     const r = c.shaderc_result_get_compilation_status(result);
     if (@enumToInt(r) != c.shaderc_compilation_status_success) {
+        var start: usize = 0;
+        var prelude_newlines: u32 = 0;
+        while (std.mem.indexOf(u8, prelude[start..], "\n")) |end| {
+            prelude_newlines += 1;
+            start += end + 1;
+        }
+
         // Copy the error out of the shader
         const err_msg = c.shaderc_result_get_error_message(result);
         const len = std.mem.len(err_msg);
@@ -200,7 +207,7 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) !Result 
 
         // Prase out individual lines of the error message, figuring out
         // which ones have a line number attached.
-        var start: usize = 0;
+        start = 0;
         var errs = std.ArrayList(LineErr).init(alloc);
         while (std.mem.indexOf(u8, out[start..], "\n")) |end| {
             const line = out[start..(start + end)];
@@ -222,7 +229,7 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) !Result 
                 const line_msg = try alloc.dupe(u8, line[(num_end + 1)..]);
                 try errs.append(.{
                     .msg = line_msg,
-                    .line = line_num,
+                    .line = line_num - prelude_newlines,
                 });
             } else {
                 const line_msg = try alloc.dupe(u8, line[(num_start + 2)..]);

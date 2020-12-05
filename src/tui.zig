@@ -567,7 +567,7 @@ pub const Tui = struct {
             if (self.buffers.get(buf_num)) |buf| {
                 const shader_text = try buf.to_buf();
                 defer self.alloc.free(shader_text);
-                try self.rebuild_preview(shader_text);
+                try self.rebuild_preview(buf_num, shader_text);
             }
         }
 
@@ -576,7 +576,7 @@ pub const Tui = struct {
         return true;
     }
 
-    fn rebuild_preview(self: *Self, shader_text: []const u8) !void {
+    fn rebuild_preview(self: *Self, buf_num: u32, shader_text: []const u8) !void {
         const out = try shaderc.build_preview_shader(self.alloc, shader_text);
         std.debug.print("{}\n", .{out});
         defer out.deinit(self.alloc);
@@ -587,7 +587,23 @@ pub const Tui = struct {
             },
             .Error => |e| {
                 self.renderer.clear_preview(self.alloc);
-                std.debug.print("Got error {s}\n", .{e.errs});
+                for (e.errs) |line_err| {
+                    const cmd = try std.fmt.allocPrint(
+                        self.alloc,
+                        ":sign place {} line={} name=fpErr buffer={}",
+                        .{
+                            line_err.line,
+                            line_err.line,
+                            buf_num,
+                        },
+                    );
+                    defer self.alloc.free(cmd);
+                    std.debug.print("Error at line {}\n", .{line_err.line});
+
+                    const reply = try self.rpc.call("nvim_command", .{cmd});
+                    std.debug.print("{}\n", .{reply});
+                    defer self.rpc.release(reply);
+                }
             },
         }
     }

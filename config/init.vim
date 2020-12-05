@@ -38,3 +38,4 @@ augroup fp
 augroup end
 
 sign define fpErr text=>> texthl=Search
+set signcolumn=yes

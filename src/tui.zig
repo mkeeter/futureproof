@@ -581,6 +581,11 @@ pub const Tui = struct {
         std.debug.print("{}\n", .{out});
         defer out.deinit(self.alloc);
 
+        { // Clear all of the error markers before compiling the shader
+            const reply = try self.rpc.call("nvim_command", .{":sign unplace *"});
+            defer self.rpc.release(reply);
+        }
+
         switch (out) {
             .Shader => |s| {
                 try self.renderer.update_preview(self.alloc, s);

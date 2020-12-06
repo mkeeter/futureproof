@@ -1,7 +1,7 @@
 
 augroup fp
   autocmd!
-  autocmd BufNewFile,BufReadPost * call rpcnotify(0, 'Fp', 'buf_new', str2nr(expand('<abuf>')))
+  autocmd FileType glsl call rpcnotify(0, 'Fp', 'buf_new', str2nr(expand('<abuf>')))
 augroup end
 
 let s:bg= synIDattr(synIDtrans(hlID("SignColumn")), "bg#")

@@ -168,9 +168,6 @@ pub const Tui = struct {
             defer rpc.release(reply);
         }
 
-        // Attach to events from the first buffer
-        try out.attach_buffer(1);
-
         { // Send the template text to the first buffer
             const src = try util.file_contents(
                 tmp_alloc,

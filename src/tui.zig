@@ -599,22 +599,27 @@ pub const Tui = struct {
 
                 var i: usize = 0;
                 for (e.errs) |line_err| {
+                    var line_num: u32 = 1;
+                    if (line_err.line) |n| {
+                        line_num = n;
+                    }
                     const cmd = try std.fmt.allocPrint(
                         tmp_alloc,
                         ":sign place {} line={} name=fpErr buffer={}",
                         .{
-                            line_err.line,
-                            line_err.line,
+                            line_num,
+                            line_num,
                             buf_num,
                         },
                     );
-                    self.rpc.release(try self.rpc.call("nvim_command", .{cmd}));
-
+                    self.rpc.release(
+                        try self.rpc.call("nvim_command", .{cmd}),
+                    );
                     lines[i] = msgpack.Value{
                         .RawString = try std.fmt.allocPrint(
                             tmp_alloc,
                             "{}:{}",
-                            .{ line_err.line, line_err.msg },
+                            .{ line_num, line_err.msg },
                         ),
                     };
                     i += 1;

@@ -24,6 +24,8 @@ const Listener = struct {
             const in = try self.input.read(&buf);
             if (in == 0) {
                 break;
+            } else if (in == buf.len) {
+                std.debug.panic("msgpack message is too long\n", .{});
             }
             var offset: usize = 0;
             while (offset != in) {

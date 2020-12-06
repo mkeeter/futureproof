@@ -19,7 +19,7 @@ const Listener = struct {
     alloc: *std.mem.Allocator,
 
     fn run(self: *Listener) !void {
-        var buf: [1024 * 32]u8 = undefined;
+        var buf: [1024 * 1024]u8 = undefined;
         while (true) {
             const in = try self.input.read(&buf);
             if (in == 0) {

@@ -587,10 +587,17 @@ pub const Tui = struct {
                 try self.renderer.update_preview(self.alloc, s);
             },
             .Error => |e| {
+                var arena = std.heap.ArenaAllocator.init(self.alloc);
+                const tmp_alloc: *std.mem.Allocator = &arena.allocator;
+                defer arena.deinit();
+
                 self.renderer.clear_preview(self.alloc);
+                const lines = try tmp_alloc.alloc(msgpack.Value, e.errs.len);
+
+                var i: usize = 0;
                 for (e.errs) |line_err| {
                     const cmd = try std.fmt.allocPrint(
-                        self.alloc,
+                        tmp_alloc,
                         ":sign place {} line={} name=fpErr buffer={}",
                         .{
                             line_err.line,
@@ -598,11 +605,25 @@ pub const Tui = struct {
                             buf_num,
                         },
                     );
-                    defer self.alloc.free(cmd);
 
                     const reply = try self.rpc.call("nvim_command", .{cmd});
                     defer self.rpc.release(reply);
+
+                    lines[i] = msgpack.Value{
+                        .RawString = try std.fmt.allocPrint(
+                            tmp_alloc,
+                            "{}:{}",
+                            .{ line_err.line, line_err.msg },
+                        ),
+                    };
+                    i += 1;
                 }
+                const encoded = try msgpack.Value.encode(tmp_alloc, lines);
+                const reply = try self.rpc.call(
+                    "nvim_buf_set_lines",
+                    .{ 2, 0, -1, true, encoded },
+                );
+                defer self.rpc.release(reply);
             },
         }
     }

@@ -201,7 +201,7 @@ pub const Tui = struct {
         // Clean up and set the filetype
         rpc.release(try rpc.call(
             "nvim_input",
-            .{"ddgg:set filetype=glsl<Enter>"},
+            .{"ddgg:set filetype=glsl<Enter>:setlocal nomodified<Enter>"},
         ));
 
         out.update_size(width, height);

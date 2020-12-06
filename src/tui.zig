@@ -67,8 +67,10 @@ pub const Tui = struct {
     fn attach_buffer(self: *Self, id: u32) !void {
         var options = msgpack.KeyValueMap.init(self.alloc);
         defer options.deinit();
-        const reply = try self.rpc.call("nvim_buf_attach", .{ id, true, options });
-        defer self.rpc.release(reply);
+        self.rpc.release(try self.rpc.call(
+            "nvim_buf_attach",
+            .{ id, true, options },
+        ));
 
         // Create a buffer on the heap and store it in the hash map.
         var buf = try self.alloc.create(Buffer);
@@ -157,15 +159,16 @@ pub const Tui = struct {
                 msgpack.Value{ .Boolean = true },
             );
             defer options.deinit();
-            const reply = try rpc.call("nvim_ui_attach", .{ x_tiles, y_tiles, options });
-            defer rpc.release(reply);
+            rpc.release(try rpc.call(
+                "nvim_ui_attach",
+                .{ x_tiles, y_tiles, options },
+            ));
         }
 
         { // Try to subscribe to Fp events
             var options = msgpack.KeyValueMap.init(alloc);
             defer options.deinit();
-            const reply = try rpc.call("nvim_subscribe", .{"Fp"});
-            defer rpc.release(reply);
+            rpc.release(try rpc.call("nvim_subscribe", .{"Fp"}));
         }
 
         { // Send the template text to the first buffer
@@ -191,11 +194,10 @@ pub const Tui = struct {
             // Encode the lines manually, as encoding nested structs
             // doesn't work right now (TODO).
             const encoded = try msgpack.Value.encode(tmp_alloc, lines);
-            const reply = try rpc.call(
+            rpc.release(try rpc.call(
                 "nvim_buf_set_lines",
                 .{ 0, 0, 0, false, encoded },
-            );
-            defer rpc.release(reply);
+            ));
         }
 
         // Clean up and set the filetype
@@ -577,10 +579,11 @@ pub const Tui = struct {
         const out = try shaderc.build_preview_shader(self.alloc, shader_text);
         defer out.deinit(self.alloc);
 
-        { // Clear all of the error markers before compiling the shader
-            const reply = try self.rpc.call("nvim_command", .{":sign unplace *"});
-            defer self.rpc.release(reply);
-        }
+        // Clear all of the error markers before compiling the shader
+        self.rpc.release(try self.rpc.call(
+            "nvim_command",
+            .{":sign unplace *"},
+        ));
 
         switch (out) {
             .Shader => |s| {
@@ -605,9 +608,7 @@ pub const Tui = struct {
                             buf_num,
                         },
                     );
-
-                    const reply = try self.rpc.call("nvim_command", .{cmd});
-                    defer self.rpc.release(reply);
+                    self.rpc.release(try self.rpc.call("nvim_command", .{cmd}));
 
                     lines[i] = msgpack.Value{
                         .RawString = try std.fmt.allocPrint(
@@ -619,11 +620,10 @@ pub const Tui = struct {
                     i += 1;
                 }
                 const encoded = try msgpack.Value.encode(tmp_alloc, lines);
-                const reply = try self.rpc.call(
+                self.rpc.release(try self.rpc.call(
                     "nvim_buf_set_lines",
                     .{ 2, 0, -1, true, encoded },
-                );
-                defer self.rpc.release(reply);
+                ));
             },
         }
     }
@@ -674,7 +674,7 @@ pub const Tui = struct {
         ) catch |err| {
             std.debug.panic("Failed to resize UI: {}\n", .{err});
         };
-        defer self.rpc.release(reply);
+        self.rpc.release(reply);
 
         self.char_grid[self.total_tiles] = cursor_x;
         self.char_grid[self.total_tiles + 1] = cursor_y;
@@ -859,10 +859,7 @@ pub const Tui = struct {
         }
 
         if (str) |s| {
-            const reply = self.rpc.call("nvim_input", .{s}) catch |err| {
-                std.debug.panic("Failed to call nvim_input: {}", .{err});
-            };
-            defer self.rpc.release(reply);
+            self.rpc.release(try self.rpc.call("nvim_input", .{s}));
         }
     }
 
@@ -920,17 +917,14 @@ pub const Tui = struct {
         };
 
         const mods_str = try encode_mods(alloc, mods);
-        const reply = self.rpc.call("nvim_input_mouse", .{
+        self.rpc.release(try self.rpc.call("nvim_input_mouse", .{
             button_str,
             action_str,
             mods_str,
             0, // grid
             self.mouse_tile_y, // row
             self.mouse_tile_x, // col
-        }) catch |err| {
-            std.debug.panic("Failed to call nvim_input_mouse: {}", .{err});
-        };
-        defer self.rpc.release(reply);
+        }));
     }
 };
 

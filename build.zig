@@ -36,16 +36,6 @@ pub fn build(b: *Builder) void {
     if (exe.target.isDarwin()) {
         exe.addFrameworkDir("/System/Library/Frameworks");
         exe.linkFramework("Foundation");
-
-        const cmd = [_][]const u8{
-            "install_name_tool",
-            "-change",
-            "/Users/runner/work/wgpu-native/wgpu-native/target/release/deps/libwgpu_native.dylib",
-            "@executable_path/../../vendor/wgpu/libwgpu_native.dylib",
-            "zig-cache/bin/futureproof",
-        };
-        const s = b.addSystemCommand(&cmd);
-        b.getInstallStep().dependOn(&s.step);
     }
 
     const run_cmd = exe.run();

@@ -15,5 +15,5 @@ set errorformat=%l:%m
 
 " Resize the quickfix window to fix errors
 function! AdjustWindowHeight(min_rows, max_rows)
-  execute max([min([line("$"), a:max_rows]), a:min_rows]) . "wincmd _"
+  execute max([min([line("$") + 1, a:max_rows]), a:min_rows]) . "wincmd _"
 endfunction

@@ -594,9 +594,19 @@ pub const Tui = struct {
             .{":sign unplace *"},
         ));
 
+        // Clear the quick-fix list
+        self.rpc.release(try self.rpc.call(
+            "nvim_command",
+            .{":lexpr \"\""},
+        ));
+
         switch (out) {
             .Shader => |s| {
                 try self.renderer.update_preview(self.alloc, s);
+                self.rpc.release(try self.rpc.call(
+                    "nvim_command",
+                    .{":call timer_start(0, {->execute(\"lclose\")})"},
+                ));
             },
             .Error => |e| {
                 var arena = std.heap.ArenaAllocator.init(self.alloc);
@@ -604,9 +614,7 @@ pub const Tui = struct {
                 defer arena.deinit();
 
                 self.renderer.clear_preview(self.alloc);
-                const lines = try tmp_alloc.alloc(msgpack.Value, e.errs.len);
 
-                var i: usize = 0;
                 for (e.errs) |line_err| {
                     var line_num: u32 = 1;
                     if (line_err.line) |n| {
@@ -624,19 +632,20 @@ pub const Tui = struct {
                     self.rpc.release(
                         try self.rpc.call("nvim_command", .{cmd}),
                     );
-                    lines[i] = msgpack.Value{
-                        .RawString = try std.fmt.allocPrint(
-                            tmp_alloc,
-                            "{}:{}",
-                            .{ line_num, line_err.msg },
-                        ),
-                    };
-                    i += 1;
+
+                    const lexp = try std.fmt.allocPrint(
+                        tmp_alloc,
+                        ":ladd \"{}:{}\"",
+                        .{ line_num, line_err.msg },
+                    );
+                    self.rpc.release(try self.rpc.call("nvim_command", .{lexp}));
                 }
-                const encoded = try msgpack.Value.encode(tmp_alloc, lines);
+                // Use zero-time functions here to avoid blocking, which stalls
+                // because nvim tries to update the UI while we wait for the
+                // function call to return
                 self.rpc.release(try self.rpc.call(
-                    "nvim_buf_set_lines",
-                    .{ 2, 0, -1, true, encoded },
+                    "nvim_command",
+                    .{":call timer_start(0, {->execute(\"lopen\")})"},
                 ));
             },
         }

@@ -605,7 +605,7 @@ pub const Tui = struct {
                 try self.renderer.update_preview(self.alloc, s);
                 self.rpc.release(try self.rpc.call(
                     "nvim_command",
-                    .{":call timer_start(0, {->execute(\"lclose\")})"},
+                    .{":lclose"},
                 ));
             },
             .Error => |e| {
@@ -640,13 +640,8 @@ pub const Tui = struct {
                     );
                     self.rpc.release(try self.rpc.call("nvim_command", .{lexp}));
                 }
-                // Use zero-time functions here to avoid blocking, which stalls
-                // because nvim tries to update the UI while we wait for the
-                // function call to return
-                self.rpc.release(try self.rpc.call(
-                    "nvim_command",
-                    .{":call timer_start(0, {->execute(\"lopen\")})"},
-                ));
+                self.rpc.release(try self.rpc.call("nvim_command", .{":lopen"}));
+                self.rpc.release(try self.rpc.call("nvim_command", .{":silent! wincmd p"}));
             },
         }
     }

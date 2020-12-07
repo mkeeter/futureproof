@@ -33,6 +33,9 @@ pub const Tui = struct {
     buffers: std.AutoHashMap(u32, *Buffer),
     debounce: Debounce,
 
+    // Persistent shader compiler to rebuild previews faster
+    compiler: c.shaderc_compiler_t,
+
     char_grid: [512 * 512]u32,
     x_tiles: u32,
     y_tiles: u32,
@@ -60,6 +63,7 @@ pub const Tui = struct {
             self.alloc.destroy(buf.value);
         }
         self.buffers.deinit();
+        c.shaderc_compiler_release(self.compiler);
 
         self.alloc.destroy(self);
     }
@@ -122,6 +126,7 @@ pub const Tui = struct {
 
             .buffers = std.AutoHashMap(u32, *Buffer).init(alloc),
             .debounce = Debounce.init(),
+            .compiler = c.shaderc_compiler_initialize(),
 
             .char_grid = undefined,
             .x_tiles = 0,
@@ -576,7 +581,11 @@ pub const Tui = struct {
     }
 
     fn rebuild_preview(self: *Self, buf_num: u32, shader_text: []const u8) !void {
-        const out = try shaderc.build_preview_shader(self.alloc, shader_text);
+        const out = try shaderc.build_preview_shader(
+            self.alloc,
+            self.compiler,
+            shader_text,
+        );
         defer out.deinit(self.alloc);
 
         // Clear all of the error markers before compiling the shader

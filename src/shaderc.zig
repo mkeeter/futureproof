@@ -93,6 +93,7 @@ pub fn build_shader(alloc: *std.mem.Allocator, name: []const u8, src: []const u8
     defer c.shaderc_compiler_release(compiler);
 
     const options = c.shaderc_compile_options_initialize();
+    defer c.shaderc_compile_options_release(options);
     c.shaderc_compile_options_set_include_callbacks(options, include_cb, include_release_cb, alloc);
 
     const result = c.shaderc_compile_into_spv(
@@ -153,10 +154,11 @@ pub const Result = union(enum) {
     }
 };
 
-pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) !Result {
-    const compiler = c.shaderc_compiler_initialize();
-    defer c.shaderc_compiler_release(compiler);
-
+pub fn build_preview_shader(
+    alloc: *std.mem.Allocator,
+    compiler: c.shaderc_compiler_t,
+    src: []const u8,
+) !Result {
     // Load the standard fragment shader prelude from a file
     // (or embed in the source if this is a release build)
     var arena = std.heap.ArenaAllocator.init(alloc);
@@ -178,6 +180,7 @@ pub fn build_preview_shader(alloc: *std.mem.Allocator, src: []const u8) !Result 
         include_release_cb,
         alloc,
     );
+    defer c.shaderc_compile_options_release(options);
 
     const result = c.shaderc_compile_into_spv(
         compiler,

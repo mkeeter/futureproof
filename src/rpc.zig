@@ -91,6 +91,10 @@ pub const RPC = struct {
         value.destroy(self.alloc);
     }
 
+    pub fn call_release(self: *RPC, method: []const u8, params: anytype) !void {
+        self.release(try self.call(method, params));
+    }
+
     pub fn call(self: *RPC, method: []const u8, params: anytype) !msgpack.Value {
         // We'll use an arena for the encoded message
         var arena = std.heap.ArenaAllocator.init(self.alloc);

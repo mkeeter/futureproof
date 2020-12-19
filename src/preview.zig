@@ -9,8 +9,11 @@ pub const Preview = struct {
     device: c.WGPUDeviceId,
     queue: c.WGPUQueueId,
 
-    tex: c.WGPUTextureId,
-    tex_view: c.WGPUTextureViewId,
+    // We render into tex[0] in tiles to keep up a good framerate, then
+    // copy to tex[1] to render the complete image without tearing
+    tex: [2]c.WGPUTextureId,
+    tex_view: [2]c.WGPUTextureViewId,
+    tex_size: c.WGPUExtent3d,
 
     bind_group: c.WGPUBindGroupId,
     uniform_buffer: c.WGPUBufferId,
@@ -183,12 +186,13 @@ pub const Preview = struct {
             // Assigned in set_size below
             .tex = undefined,
             .tex_view = undefined,
+            .tex_size = undefined,
 
             .uniforms = .{
                 .iResolution = .{ .x = 0, .y = 0, .z = 0 },
                 .iTime = 0.0,
                 .iMouse = .{ .x = 0, .y = 0, .z = 0, .w = 0 },
-                ._tiles_per_side = 2,
+                ._tiles_per_side = 1,
                 ._tile_num = 0,
             },
         };
@@ -197,8 +201,12 @@ pub const Preview = struct {
     fn destroy_textures(self: *const Self) void {
         // If the texture was created, then destroy it
         if (self.uniforms.iResolution.x != 0) {
-            c.wgpu_texture_destroy(self.tex);
-            c.wgpu_texture_view_destroy(self.tex_view);
+            for (self.tex) |t| {
+                c.wgpu_texture_destroy(t);
+            }
+            for (self.tex_view) |t| {
+                c.wgpu_texture_view_destroy(t);
+            }
         }
     }
 
@@ -212,43 +220,51 @@ pub const Preview = struct {
     pub fn set_size(self: *Self, width: u32, height: u32) void {
         self.destroy_textures();
 
-        const tex_size = (c.WGPUExtent3d){
+        self.tex_size = (c.WGPUExtent3d){
             .width = @intCast(u32, width / 2),
             .height = @intCast(u32, height),
             .depth = 1,
         };
 
-        self.tex = c.wgpu_device_create_texture(
-            self.device,
-            &(c.WGPUTextureDescriptor){
-                .size = tex_size,
-                .mip_level_count = 1,
-                .sample_count = 1,
-                .dimension = c.WGPUTextureDimension._D2,
-                .format = c.WGPUTextureFormat._Bgra8Unorm,
+        var i: u8 = 0;
+        while (i < 2) : (i += 1) {
+            self.tex[i] = c.wgpu_device_create_texture(
+                self.device,
+                &(c.WGPUTextureDescriptor){
+                    .size = self.tex_size,
+                    .mip_level_count = 1,
+                    .sample_count = 1,
+                    .dimension = c.WGPUTextureDimension._D2,
+                    .format = c.WGPUTextureFormat._Bgra8Unorm,
 
-                // We render to this texture, then use it as a source when
-                // blitting into the final UI image
-                .usage = 0 |
-                    c.WGPUTextureUsage_OUTPUT_ATTACHMENT |
-                    c.WGPUTextureUsage_SAMPLED,
-                .label = "preview_tex",
-            },
-        );
+                    // We render to this texture, then use it as a source when
+                    // blitting into the final UI image
+                    .usage = if (i == 0)
+                        (c.WGPUTextureUsage_OUTPUT_ATTACHMENT |
+                            c.WGPUTextureUsage_COPY_SRC)
+                    else
+                        (c.WGPUTextureUsage_OUTPUT_ATTACHMENT |
+                            c.WGPUTextureUsage_COPY_SRC |
+                            c.WGPUTextureUsage_SAMPLED |
+                            c.WGPUTextureUsage_COPY_DST),
+                    .label = "preview_tex",
+                },
+            );
 
-        self.tex_view = c.wgpu_texture_create_view(
-            self.tex,
-            &(c.WGPUTextureViewDescriptor){
-                .label = "preview_tex_view",
-                .dimension = c.WGPUTextureViewDimension._D2,
-                .format = c.WGPUTextureFormat._Rgba8Unorm,
-                .aspect = c.WGPUTextureAspect._All,
-                .base_mip_level = 0,
-                .level_count = 1,
-                .base_array_layer = 0,
-                .array_layer_count = 1,
-            },
-        );
+            self.tex_view[i] = c.wgpu_texture_create_view(
+                self.tex[i],
+                &(c.WGPUTextureViewDescriptor){
+                    .label = "preview_tex_view",
+                    .dimension = c.WGPUTextureViewDimension._D2,
+                    .format = c.WGPUTextureFormat._Rgba8Unorm,
+                    .aspect = c.WGPUTextureAspect._All,
+                    .base_mip_level = 0,
+                    .level_count = 1,
+                    .base_array_layer = 0,
+                    .array_layer_count = 1,
+                },
+            );
+        }
 
         self.uniforms.iResolution.x = @intToFloat(f32, width) / 2;
         self.uniforms.iResolution.y = @intToFloat(f32, height);
@@ -260,18 +276,17 @@ pub const Preview = struct {
             &(c.WGPUCommandEncoderDescriptor){ .label = "preview encoder" },
         );
 
-        const time_ms = std.time.milliTimestamp() - self.start_time;
-        const abs_time = @intToFloat(f32, time_ms) / 1000.0;
-
         // Set the time in the uniforms array
-        var uniforms = self.uniforms;
-        uniforms.iTime = abs_time;
+        if (self.uniforms._tile_num == 0) {
+            const time_ms = std.time.milliTimestamp() - self.start_time;
+            self.uniforms.iTime = @intToFloat(f32, time_ms) / 1000.0;
+        }
 
         c.wgpu_queue_write_buffer(
             self.queue,
             self.uniform_buffer,
             0,
-            @ptrCast([*c]const u8, &uniforms),
+            @ptrCast([*c]const u8, &self.uniforms),
             @sizeOf(c.fpPreviewUniforms),
         );
 
@@ -281,7 +296,7 @@ pub const Preview = struct {
             c.WGPULoadOp._Load;
         const color_attachments = [_]c.WGPURenderPassColorAttachmentDescriptor{
             (c.WGPURenderPassColorAttachmentDescriptor){
-                .attachment = self.tex_view,
+                .attachment = if (self.uniforms._tiles_per_side == 1) self.tex_view[1] else self.tex_view[0],
                 .resolve_target = 0,
                 .channel = (c.WGPUPassChannel_Color){
                     .load_op = load_op,
@@ -311,11 +326,34 @@ pub const Preview = struct {
         c.wgpu_render_pass_draw(rpass, 6, 1, 0, 0);
         c.wgpu_render_pass_end_pass(rpass);
 
+        // Move on to the next tile
+        self.uniforms._tile_num += 1;
+
+        // If we just finished rendering every tile, then also copy
+        // to the deployment tex
+        if (self.uniforms._tiles_per_side > 1 and
+            self.uniforms._tile_num == std.math.pow(u32, self.uniforms._tiles_per_side, 2))
+        {
+            const src = (c.WGPUTextureCopyView){
+                .texture = self.tex[0],
+                .mip_level = 0,
+                .origin = (c.WGPUOrigin3d){ .x = 0, .y = 0, .z = 0 },
+            };
+            const dst = (c.WGPUTextureCopyView){
+                .texture = self.tex[1],
+                .mip_level = 0,
+                .origin = (c.WGPUOrigin3d){ .x = 0, .y = 0, .z = 0 },
+            };
+            c.wgpu_command_encoder_copy_texture_to_texture(
+                cmd_encoder,
+                &src,
+                &dst,
+                &self.tex_size,
+            );
+            self.uniforms._tile_num = 0;
+        }
+
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);
         c.wgpu_queue_submit(self.queue, &cmd_buf, 1);
-
-        // Move on to the next tile
-        self.uniforms._tile_num = (self.uniforms._tile_num + 1) %
-            std.math.pow(u32, self.uniforms._tiles_per_side, 2);
     }
 };

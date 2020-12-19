@@ -417,7 +417,7 @@ pub const Renderer = struct {
         p.set_size(self.width, self.height);
 
         self.preview = p;
-        self.blit.bind_to_tex(p.tex_view);
+        self.blit.bind_to_tex(p.tex_view[1]);
     }
 
     pub fn update_font_tex(self: *Self, font: *const ft.Atlas) void {
@@ -512,10 +512,12 @@ pub const Renderer = struct {
 
         const end_ms = std.time.milliTimestamp();
         const dt = end_ms - start_ms;
+        if (self.preview) |p| {
+            std.debug.print("{} {}\n", .{ p.uniforms._tile_num, end_ms - start_ms });
+        }
         if (dt > 16) {
             if (self.preview) |p| {
                 // TODO: use framerate to adjust preview resolution
-                std.debug.print("{}\n", .{end_ms - start_ms});
                 //p.adjust_scale(dt);
             }
         }
@@ -568,7 +570,7 @@ pub const Renderer = struct {
         self.height = height;
         if (self.preview) |p| {
             p.set_size(width, height);
-            self.blit.bind_to_tex(p.tex_view);
+            self.blit.bind_to_tex(p.tex_view[1]);
         }
     }
 

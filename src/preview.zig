@@ -276,9 +276,6 @@ pub const Preview = struct {
             @sizeOf(c.fpPreviewUniforms),
         );
 
-        self.uniforms._tile_num = (self.uniforms._tile_num + 1) %
-            std.math.pow(u32, self.uniforms._tiles_per_side, 2);
-
         const load_op = if (self.uniforms._tile_num == 0)
             c.WGPULoadOp._Clear
         else
@@ -317,5 +314,9 @@ pub const Preview = struct {
 
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);
         c.wgpu_queue_submit(self.queue, &cmd_buf, 1);
+
+        // Move on to the next tile
+        self.uniforms._tile_num = (self.uniforms._tile_num + 1) %
+            std.math.pow(u32, self.uniforms._tiles_per_side, 2);
     }
 };

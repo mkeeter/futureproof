@@ -194,11 +194,7 @@ pub const Preview = struct {
         };
     }
 
-    pub fn deinit(self: *const Self) void {
-        c.wgpu_bind_group_destroy(self.bind_group);
-        c.wgpu_buffer_destroy(self.uniform_buffer);
-        c.wgpu_render_pipeline_destroy(self.render_pipeline);
-
+    fn destroy_textures(self: *const Self) void {
         // If the texture was created, then destroy it
         if (self.uniforms.iResolution.x != 0) {
             c.wgpu_texture_destroy(self.tex);
@@ -206,12 +202,15 @@ pub const Preview = struct {
         }
     }
 
+    pub fn deinit(self: *const Self) void {
+        c.wgpu_bind_group_destroy(self.bind_group);
+        c.wgpu_buffer_destroy(self.uniform_buffer);
+        c.wgpu_render_pipeline_destroy(self.render_pipeline);
+        self.destroy_textures();
+    }
+
     pub fn set_size(self: *Self, width: u32, height: u32) void {
-        // If the texture was created, then destroy it
-        if (self.uniforms.iResolution.x != 0) {
-            c.wgpu_texture_destroy(self.tex);
-            c.wgpu_texture_view_destroy(self.tex_view);
-        }
+        self.destroy_textures();
 
         const tex_size = (c.WGPUExtent3d){
             .width = @intCast(u32, width / 2),

@@ -452,7 +452,7 @@ pub const Renderer = struct {
         // at a different resolution from the rest of the UI.
         if (self.preview) |p| {
             p.redraw();
-            if (p.draw_continuously) {
+            if (p.draw_continuously or (p.uniforms._tiles_per_side > 1 and p.uniforms._tile_num != 0)) {
                 c.glfwPostEmptyEvent();
             }
         }

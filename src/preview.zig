@@ -279,12 +279,16 @@ pub const Preview = struct {
         self.uniforms._tile_num = (self.uniforms._tile_num + 1) %
             std.math.pow(u32, self.uniforms._tiles_per_side, 2);
 
+        const load_op = if (self.uniforms._tile_num == 0)
+            c.WGPULoadOp._Clear
+        else
+            c.WGPULoadOp._Load;
         const color_attachments = [_]c.WGPURenderPassColorAttachmentDescriptor{
             (c.WGPURenderPassColorAttachmentDescriptor){
                 .attachment = self.tex_view,
                 .resolve_target = 0,
                 .channel = (c.WGPUPassChannel_Color){
-                    .load_op = c.WGPULoadOp._Clear,
+                    .load_op = load_op,
                     .store_op = c.WGPUStoreOp._Store,
                     .clear_value = (c.WGPUColor){
                         .r = 0.0,

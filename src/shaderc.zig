@@ -109,7 +109,7 @@ pub fn build_shader(alloc: *std.mem.Allocator, name: []const u8, src: []const u8
     const r = c.shaderc_result_get_compilation_status(result);
     if (@enumToInt(r) != c.shaderc_compilation_status_success) {
         const err = c.shaderc_result_get_error_message(result);
-        std.debug.warn("Shader error in {s}", .{err});
+        std.debug.warn("Shader error: {} {s}\n", .{ r, err });
         return status_to_err(@enumToInt(r));
     }
 

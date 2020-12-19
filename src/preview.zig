@@ -32,7 +32,7 @@ pub const Preview = struct {
 
         // Build the shaders using shaderc
         const vert_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/preview.vert") catch |err| {
-            std.debug.panic("Could not open file", .{});
+            std.debug.panic("Could not build preview.vert", .{});
         };
         const vert_shader = c.wgpu_device_create_shader_module(
             device,
@@ -67,7 +67,7 @@ pub const Preview = struct {
         const bind_group_layout_entries = [_]c.WGPUBindGroupLayoutEntry{
             (c.WGPUBindGroupLayoutEntry){
                 .binding = 0,
-                .visibility = c.WGPUShaderStage_FRAGMENT,
+                .visibility = c.WGPUShaderStage_VERTEX | c.WGPUShaderStage_FRAGMENT,
                 .ty = c.WGPUBindingType_UniformBuffer,
 
                 .has_dynamic_offset = false,
@@ -188,6 +188,8 @@ pub const Preview = struct {
                 .iResolution = .{ .x = 0, .y = 0, .z = 0 },
                 .iTime = 0.0,
                 .iMouse = .{ .x = 0, .y = 0, .z = 0, .w = 0 },
+                ._tiles_per_side = 2,
+                ._tile_num = 0,
             },
         };
     }
@@ -253,7 +255,7 @@ pub const Preview = struct {
         self.uniforms.iResolution.y = @intToFloat(f32, height);
     }
 
-    pub fn redraw(self: *const Self) void {
+    pub fn redraw(self: *Self) void {
         const cmd_encoder = c.wgpu_device_create_command_encoder(
             self.device,
             &(c.WGPUCommandEncoderDescriptor){ .label = "preview encoder" },
@@ -273,6 +275,9 @@ pub const Preview = struct {
             @ptrCast([*c]const u8, &uniforms),
             @sizeOf(c.fpPreviewUniforms),
         );
+
+        self.uniforms._tile_num = (self.uniforms._tile_num + 1) %
+            std.math.pow(u32, self.uniforms._tiles_per_side, 2);
 
         const color_attachments = [_]c.WGPURenderPassColorAttachmentDescriptor{
             (c.WGPURenderPassColorAttachmentDescriptor){
@@ -303,7 +308,7 @@ pub const Preview = struct {
 
         c.wgpu_render_pass_set_pipeline(rpass, self.render_pipeline);
         c.wgpu_render_pass_set_bind_group(rpass, 0, self.bind_group, null, 0);
-        c.wgpu_render_pass_draw(rpass, 3, 1, 0, 0);
+        c.wgpu_render_pass_draw(rpass, 6, 1, 0, 0);
         c.wgpu_render_pass_end_pass(rpass);
 
         const cmd_buf = c.wgpu_command_encoder_finish(cmd_encoder, null);

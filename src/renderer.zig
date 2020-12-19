@@ -509,8 +509,14 @@ pub const Renderer = struct {
         c.wgpu_swap_chain_present(self.swap_chain);
 
         const end_ms = std.time.milliTimestamp();
-        // TODO: use framerate to adjust preview resolution
-        std.debug.print("{}\n", .{end_ms - start_ms});
+        const dt = end_ms - start_ms;
+        if (dt > 16) {
+            if (self.preview) |p| {
+                // TODO: use framerate to adjust preview resolution
+                std.debug.print("{}\n", .{end_ms - start_ms});
+                //p.adjust_scale(dt);
+            }
+        }
     }
 
     pub fn deinit(self: *Self, alloc: *std.mem.Allocator) void {

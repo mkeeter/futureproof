@@ -101,9 +101,7 @@ pub const Renderer = struct {
 
         ////////////////////////////////////////////////////////////////////////////
         // Build the shaders using shaderc
-        const vert_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/grid.vert") catch |err| {
-            std.debug.panic("Could not open file", .{});
-        };
+        const vert_spv = try shaderc.build_shader_from_file(tmp_alloc, "shaders/grid.vert");
         const vert_shader = c.wgpu_device_create_shader_module(
             device,
             (c.WGPUShaderSource){
@@ -113,9 +111,7 @@ pub const Renderer = struct {
         );
         defer c.wgpu_shader_module_destroy(vert_shader);
 
-        const frag_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/grid.frag") catch |err| {
-            std.debug.panic("Could not open file", .{});
-        };
+        const frag_spv = try shaderc.build_shader_from_file(tmp_alloc, "shaders/grid.frag");
         const frag_shader = c.wgpu_device_create_shader_module(
             device,
             (c.WGPUShaderSource){
@@ -133,57 +129,72 @@ pub const Renderer = struct {
             .depth = 1,
         };
 
-        const tex = c.wgpu_device_create_texture(device, &(c.WGPUTextureDescriptor){
-            .size = tex_size,
-            .mip_level_count = 1,
-            .sample_count = 1,
-            .dimension = c.WGPUTextureDimension._D2,
-            .format = c.WGPUTextureFormat._Rgba8Unorm,
-            // SAMPLED tells wgpu that we want to use this texture in shaders
-            // COPY_DST means that we want to copy data to this texture
-            .usage = c.WGPUTextureUsage_SAMPLED | c.WGPUTextureUsage_COPY_DST,
-            .label = "font_atlas",
-        });
+        const tex = c.wgpu_device_create_texture(
+            device,
+            &(c.WGPUTextureDescriptor){
+                .size = tex_size,
+                .mip_level_count = 1,
+                .sample_count = 1,
+                .dimension = c.WGPUTextureDimension._D2,
+                .format = c.WGPUTextureFormat._Rgba8Unorm,
+                // SAMPLED tells wgpu that we want to use this texture in shaders
+                // COPY_DST means that we want to copy data to this texture
+                .usage = c.WGPUTextureUsage_SAMPLED | c.WGPUTextureUsage_COPY_DST,
+                .label = "font_atlas",
+            },
+        );
 
-        const tex_view = c.wgpu_texture_create_view(tex, &(c.WGPUTextureViewDescriptor){
-            .label = "font_atlas_view",
-            .dimension = c.WGPUTextureViewDimension._D2,
-            .format = c.WGPUTextureFormat._Rgba8Unorm,
-            .aspect = c.WGPUTextureAspect._All,
-            .base_mip_level = 0,
-            .level_count = 1,
-            .base_array_layer = 0,
-            .array_layer_count = 1,
-        });
+        const tex_view = c.wgpu_texture_create_view(
+            tex,
+            &(c.WGPUTextureViewDescriptor){
+                .label = "font_atlas_view",
+                .dimension = c.WGPUTextureViewDimension._D2,
+                .format = c.WGPUTextureFormat._Rgba8Unorm,
+                .aspect = c.WGPUTextureAspect._All,
+                .base_mip_level = 0,
+                .level_count = 1,
+                .base_array_layer = 0,
+                .array_layer_count = 1,
+            },
+        );
 
-        const tex_sampler = c.wgpu_device_create_sampler(device, &(c.WGPUSamplerDescriptor){
-            .next_in_chain = null,
-            .label = "font_atlas_sampler",
-            .address_mode_u = c.WGPUAddressMode._ClampToEdge,
-            .address_mode_v = c.WGPUAddressMode._ClampToEdge,
-            .address_mode_w = c.WGPUAddressMode._ClampToEdge,
-            .mag_filter = c.WGPUFilterMode._Linear,
-            .min_filter = c.WGPUFilterMode._Nearest,
-            .mipmap_filter = c.WGPUFilterMode._Nearest,
-            .lod_min_clamp = 0.0,
-            .lod_max_clamp = std.math.f32_max,
-            .compare = c.WGPUCompareFunction._Undefined,
-        });
+        const tex_sampler = c.wgpu_device_create_sampler(
+            device,
+            &(c.WGPUSamplerDescriptor){
+                .next_in_chain = null,
+                .label = "font_atlas_sampler",
+                .address_mode_u = c.WGPUAddressMode._ClampToEdge,
+                .address_mode_v = c.WGPUAddressMode._ClampToEdge,
+                .address_mode_w = c.WGPUAddressMode._ClampToEdge,
+                .mag_filter = c.WGPUFilterMode._Linear,
+                .min_filter = c.WGPUFilterMode._Nearest,
+                .mipmap_filter = c.WGPUFilterMode._Nearest,
+                .lod_min_clamp = 0.0,
+                .lod_max_clamp = std.math.f32_max,
+                .compare = c.WGPUCompareFunction._Undefined,
+            },
+        );
 
         ////////////////////////////////////////////////////////////////////////////
         // Uniform buffers
-        const uniform_buffer = c.wgpu_device_create_buffer(device, &(c.WGPUBufferDescriptor){
-            .label = "Uniforms",
-            .size = @sizeOf(c.fpUniforms),
-            .usage = c.WGPUBufferUsage_UNIFORM | c.WGPUBufferUsage_COPY_DST,
-            .mapped_at_creation = false,
-        });
-        const char_grid_buffer = c.wgpu_device_create_buffer(device, &(c.WGPUBufferDescriptor){
-            .label = "Character grid",
-            .size = @sizeOf(u32) * 512 * 512,
-            .usage = c.WGPUBufferUsage_STORAGE | c.WGPUBufferUsage_COPY_DST,
-            .mapped_at_creation = false,
-        });
+        const uniform_buffer = c.wgpu_device_create_buffer(
+            device,
+            &(c.WGPUBufferDescriptor){
+                .label = "Uniforms",
+                .size = @sizeOf(c.fpUniforms),
+                .usage = c.WGPUBufferUsage_UNIFORM | c.WGPUBufferUsage_COPY_DST,
+                .mapped_at_creation = false,
+            },
+        );
+        const char_grid_buffer = c.wgpu_device_create_buffer(
+            device,
+            &(c.WGPUBufferDescriptor){
+                .label = "Character grid",
+                .size = @sizeOf(u32) * 512 * 512,
+                .usage = c.WGPUBufferUsage_STORAGE | c.WGPUBufferUsage_COPY_DST,
+                .mapped_at_creation = false,
+            },
+        );
 
         ////////////////////////////////////////////////////////////////////////////
         // Bind groups (?!)
@@ -244,11 +255,14 @@ pub const Renderer = struct {
                 .count = undefined,
             },
         };
-        const bind_group_layout = c.wgpu_device_create_bind_group_layout(device, &(c.WGPUBindGroupLayoutDescriptor){
-            .label = "bind group layout",
-            .entries = &bind_group_layout_entries,
-            .entries_length = bind_group_layout_entries.len,
-        });
+        const bind_group_layout = c.wgpu_device_create_bind_group_layout(
+            device,
+            &(c.WGPUBindGroupLayoutDescriptor){
+                .label = "bind group layout",
+                .entries = &bind_group_layout_entries,
+                .entries_length = bind_group_layout_entries.len,
+            },
+        );
         defer c.wgpu_bind_group_layout_destroy(bind_group_layout);
 
         const bind_group_entries = [_]c.WGPUBindGroupEntry{
@@ -289,12 +303,15 @@ pub const Renderer = struct {
                 .texture_view = 0, // None
             },
         };
-        const bind_group = c.wgpu_device_create_bind_group(device, &(c.WGPUBindGroupDescriptor){
-            .label = "bind group",
-            .layout = bind_group_layout,
-            .entries = &bind_group_entries,
-            .entries_length = bind_group_entries.len,
-        });
+        const bind_group = c.wgpu_device_create_bind_group(
+            device,
+            &(c.WGPUBindGroupDescriptor){
+                .label = "bind group",
+                .layout = bind_group_layout,
+                .entries = &bind_group_entries,
+                .entries_length = bind_group_entries.len,
+            },
+        );
         const bind_group_layouts = [_]c.WGPUBindGroupId{bind_group_layout};
 
         ////////////////////////////////////////////////////////////////////////////

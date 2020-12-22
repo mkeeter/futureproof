@@ -34,6 +34,11 @@ pub const Renderer = struct {
     preview: ?*Preview,
     blit: Blit,
 
+    // We track the last few preview times; if the media is under 30 FPS,
+    // then we switch to tiled rendering
+    dt: [5]i64,
+    dt_index: usize,
+
     pub fn init(alloc: *std.mem.Allocator, window: *c.GLFWwindow, font: *const ft.Atlas) !Self {
         var arena = std.heap.ArenaAllocator.init(alloc);
         const tmp_alloc: *std.mem.Allocator = &arena.allocator;
@@ -394,8 +399,12 @@ pub const Renderer = struct {
 
             .preview = null,
             .blit = try Blit.init(alloc, device),
+
+            .dt = undefined,
+            .dt_index = 0,
         };
 
+        out.reset_dt();
         out.update_font_tex(font);
         return out;
     }
@@ -408,6 +417,14 @@ pub const Renderer = struct {
         }
     }
 
+    fn reset_dt(self: *Self) void {
+        var i: usize = 0;
+        while (i < self.dt.len) : (i += 1) {
+            self.dt[i] = 0;
+        }
+        self.dt_index = 0;
+    }
+
     pub fn update_preview(self: *Self, alloc: *std.mem.Allocator, s: Shader) !void {
         self.clear_preview(alloc);
 
@@ -418,6 +435,7 @@ pub const Renderer = struct {
 
         self.preview = p;
         self.blit.bind_to_tex(p.tex_view[1]);
+        self.reset_dt();
     }
 
     pub fn update_font_tex(self: *Self, font: *const ft.Atlas) void {
@@ -511,14 +529,18 @@ pub const Renderer = struct {
         c.wgpu_swap_chain_present(self.swap_chain);
 
         const end_ms = std.time.milliTimestamp();
-        const dt = end_ms - start_ms;
-        if (self.preview) |p| {
-            std.debug.print("{} {}\n", .{ p.uniforms._tile_num, end_ms - start_ms });
-        }
-        if (dt > 16) {
+        self.dt[self.dt_index] = end_ms - start_ms;
+        self.dt_index = (self.dt_index + 1) % self.dt.len;
+
+        var dt_local = self.dt;
+        comptime const asc = std.sort.asc(i64);
+        std.sort.sort(i64, dt_local[0..], {}, asc);
+        const dt = dt_local[self.dt.len / 2];
+
+        if (dt > 33) {
             if (self.preview) |p| {
-                // TODO: use framerate to adjust preview resolution
-                //p.adjust_scale(dt);
+                p.adjust_tiles(dt);
+                self.reset_dt();
             }
         }
     }

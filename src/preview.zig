@@ -210,6 +210,21 @@ pub const Preview = struct {
         }
     }
 
+    pub fn adjust_tiles(self: *Self, dt: i64) void {
+        // What's the total render time, approximately?
+        const dt_est = std.math.pow(i64, self.uniforms._tiles_per_side, 2) * dt;
+
+        // We'd like to keep the UI running at 60 FPS, approximately
+        const t = std.math.ceil(std.math.sqrt(@intToFloat(f32, @divFloor(dt_est, 16))));
+
+        std.debug.print(
+            "Switching from {} to {} tiles per side\n",
+            .{ self.uniforms._tiles_per_side, t },
+        );
+        self.uniforms._tiles_per_side = @floatToInt(u32, t);
+        self.uniforms._tile_num = 0;
+    }
+
     pub fn deinit(self: *const Self) void {
         c.wgpu_bind_group_destroy(self.bind_group);
         c.wgpu_buffer_destroy(self.uniform_buffer);
@@ -327,13 +342,13 @@ pub const Preview = struct {
         c.wgpu_render_pass_end_pass(rpass);
 
         // Move on to the next tile
-        self.uniforms._tile_num += 1;
+        if (self.uniforms._tiles_per_side > 1) {
+            self.uniforms._tile_num += 1;
+        }
 
         // If we just finished rendering every tile, then also copy
         // to the deployment tex
-        if (self.uniforms._tiles_per_side > 1 and
-            self.uniforms._tile_num == std.math.pow(u32, self.uniforms._tiles_per_side, 2))
-        {
+        if (self.uniforms._tile_num == std.math.pow(u32, self.uniforms._tiles_per_side, 2)) {
             const src = (c.WGPUTextureCopyView){
                 .texture = self.tex[0],
                 .mip_level = 0,

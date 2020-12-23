@@ -221,7 +221,11 @@ pub const Preview = struct {
             "Switching from {} to {} tiles per side\n",
             .{ self.uniforms._tiles_per_side, t },
         );
-        self.uniforms._tiles_per_side = @floatToInt(u32, t);
+        var t_ = @floatToInt(u32, t);
+        if (t_ > 5) {
+            t_ = 5;
+        }
+        self.uniforms._tiles_per_side = t_;
         self.uniforms._tile_num = 0;
     }
 

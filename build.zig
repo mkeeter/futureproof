@@ -28,12 +28,15 @@ pub fn build(b: *Builder) void {
     exe.linkSystemLibrary("shaderc_combined");
     exe.addIncludeDir("vendor/shaderc/include/");
 
+    exe.addIncludeDir("."); // for "extern/futureproof.h"
+
     // This must come before the install_name_tool call below
     exe.install();
 
     if (exe.target.isDarwin()) {
         exe.addFrameworkDir("/System/Library/Frameworks");
         exe.linkFramework("Foundation");
+        exe.linkFramework("AppKit");
     }
 
     const run_cmd = exe.run();

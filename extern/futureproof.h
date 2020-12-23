@@ -1,13 +1,4 @@
-#if GL_core_profile
-// Compiling as GLSL
-#define uint32_t uint
-#define int32_t int
-#define MEMBER_STRUCT
-#else
-// Compiling as a C header file
-#include <stdint.h>
-#define MEMBER_STRUCT struct
-#endif
+#include "extern/compat.h"
 
 struct fpGlyph {
     uint32_t x0, y0, width, height;

@@ -11,8 +11,8 @@ pub usingnamespace @cImport({
     @cInclude("wgpu/wgpu.h");
     @cInclude("shaderc/shaderc.h");
 
-    @cInclude("futureproof.h");
-    @cInclude("preview.h");
+    @cInclude("extern/futureproof.h");
+    @cInclude("extern/preview.h");
 
     if (builtin.os.tag == .macos) {
         @cInclude("objc/message.h");

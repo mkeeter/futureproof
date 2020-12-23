@@ -28,8 +28,6 @@ pub fn build(b: *Builder) void {
     exe.linkSystemLibrary("shaderc_combined");
     exe.addIncludeDir("vendor/shaderc/include/");
 
-    exe.addIncludeDir("extern"); // for "futureproof.h"
-
     // This must come before the install_name_tool call below
     exe.install();
 

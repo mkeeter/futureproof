@@ -59,27 +59,15 @@ pub const Renderer = struct {
             //  prototype "void objc_msgSend(void)", so we have to cast it
             //  based on the types of our arguments
             //  (https://www.mikeash.com/pyblog/objc_msgsends-new-prototype.html)
-            const uid = c.sel_getUid("contentView");
-            var call_sel = @ptrCast(
-                fn (c.id, c.SEL) callconv(.C) c.id,
-                c.objc_msgSend,
-            );
-            const cv = call_sel(ns_window, uid);
+            const objc = @import("objc.zig");
 
-            var call_sel_bool = @ptrCast(
-                fn (c.id, c.SEL, bool) callconv(.C) c.id,
-                c.objc_msgSend,
-            );
-            _ = call_sel_bool(cv, c.sel_getUid("setWantsLayer:"), true);
+            const cv = objc.call(ns_window, "contentView");
+            _ = objc.call_(cv, "setWantsLayer:", true);
 
-            const ca_metal = @ptrCast(c.id, c.objc_lookUpClass("CAMetalLayer"));
-            const metal_layer = call_sel(ca_metal, c.sel_getUid("layer"));
+            const ca_metal = objc.class("CAMetalLayer");
+            const metal_layer = objc.call(ca_metal, "layer");
 
-            var call_sel_id = @ptrCast(
-                fn (c.id, c.SEL, c.id) callconv(.C) c.id,
-                c.objc_msgSend,
-            );
-            _ = call_sel_id(cv, c.sel_getUid("setLayer:"), metal_layer);
+            _ = objc.call_(cv, "setLayer:", metal_layer);
 
             break :surf c.wgpu_create_surface_from_metal_layer(metal_layer);
         } else {

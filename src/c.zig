@@ -4,7 +4,7 @@ pub usingnamespace @cImport({
     // GLFW
     @cInclude("GLFW/glfw3.h");
 
-    // Freetype
+    // FreeType
     @cInclude("ft2build.h");
     @cInclude("freetype/freetype.h");
 

@@ -275,7 +275,7 @@ pub const Preview = struct {
                 &(c.WGPUTextureViewDescriptor){
                     .label = "preview_tex_view",
                     .dimension = c.WGPUTextureViewDimension._D2,
-                    .format = c.WGPUTextureFormat._Rgba8Unorm,
+                    .format = c.WGPUTextureFormat._Bgra8Unorm,
                     .aspect = c.WGPUTextureAspect._All,
                     .base_mip_level = 0,
                     .level_count = 1,

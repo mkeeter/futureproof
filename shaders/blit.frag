@@ -11,5 +11,5 @@ layout(set=0, binding=1) uniform sampler preview_sampler;
 layout(location=0) out vec4 out_color;
 
 void main() {
-    out_color = texture(sampler2D(preview_tex, preview_sampler), v_tex_coords).bgra;
+    out_color = texture(sampler2D(preview_tex, preview_sampler), v_tex_coords);
 }

@@ -72,7 +72,7 @@ pub const Blit = struct {
                 .multisampled = false,
                 .view_dimension = c.WGPUTextureViewDimension._D2,
                 .texture_component_type = c.WGPUTextureComponentType._Uint,
-                .storage_texture_format = c.WGPUTextureFormat._Rgba8Unorm,
+                .storage_texture_format = c.WGPUTextureFormat._Bgra8Unorm,
 
                 .count = undefined,
                 .has_dynamic_offset = undefined,

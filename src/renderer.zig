@@ -47,19 +47,14 @@ pub const Renderer = struct {
         // Extract the WGPU Surface from the platform-specific window
         const platform = builtin.os.tag;
         const surface = if (platform == .macos) surf: {
-            const cocoa_window = c.glfwGetCocoaWindow(window);
-            const ns_window = @ptrCast(c.id, @alignCast(8, cocoa_window));
-
             // Time to do hilarious Objective-C runtime hacks, equivalent to
             //  [ns_window.contentView setWantsLayer:YES];
             //  id metal_layer = [CAMetalLayer layer];
             //  [ns_window.contentView setLayer:metal_layer];
-            //
-            //  To make matters even more exciting, objc_msgSend has the
-            //  prototype "void objc_msgSend(void)", so we have to cast it
-            //  based on the types of our arguments
-            //  (https://www.mikeash.com/pyblog/objc_msgsends-new-prototype.html)
             const objc = @import("objc.zig");
+
+            const cocoa_window = objc.glfwGetCocoaWindow(window);
+            const ns_window = @ptrCast(c.id, @alignCast(8, cocoa_window));
 
             const cv = objc.call(ns_window, "contentView");
             _ = objc.call_(cv, "setWantsLayer:", true);

@@ -115,7 +115,12 @@ pub const Atlas = struct {
     }
 };
 
-pub fn build_atlas(alloc: *std.mem.Allocator, comptime font_name: []const u8, font_size: u32, tex_size: u32) !Atlas {
+pub fn build_atlas(
+    alloc: *std.mem.Allocator,
+    comptime font_name: []const u8,
+    font_size: u32,
+    tex_size: u32,
+) !Atlas {
     const tex = try alloc.alloc(u32, tex_size * tex_size);
     std.mem.set(u32, tex, 128);
     var out = Atlas{

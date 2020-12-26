@@ -5,6 +5,7 @@ const ft = @import("ft.zig");
 const msgpack = @import("msgpack.zig");
 const shaderc = @import("shaderc.zig");
 const util = @import("util.zig");
+const paste = @import("paste.zig");
 
 const Buffer = @import("buffer.zig").Buffer;
 const Debounce = @import("debounce.zig").Debounce(u32, 200);
@@ -826,6 +827,16 @@ pub const Tui = struct {
         return out;
     }
 
+    fn shortcut(self: *Self, key: c_int, mods: c_int) !bool {
+        if (key == c.GLFW_KEY_V and mods == c.GLFW_MOD_SUPER) {
+            const s = paste.get_clipboard();
+            const i = std.mem.indexOfSentinel(u8, 0, s);
+            try self.rpc.call_release("nvim_input", .{s[0..i]});
+            return true;
+        }
+        return false;
+    }
+
     pub fn on_key(self: *Self, key: c_int, mods: c_int) !void {
         var arena = std.heap.ArenaAllocator.init(self.alloc);
         var alloc: *std.mem.Allocator = &arena.allocator;
@@ -836,6 +847,8 @@ pub const Tui = struct {
 
         if (skip_key(key)) {
             // Nothing to do here
+        } else if (try self.shortcut(key, mods)) {
+            // Nothing to do here either
         } else if (get_ascii(key, mods)) |char| {
             if (char == '<') {
                 str = "<LT>";

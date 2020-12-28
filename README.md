@@ -6,7 +6,7 @@
 [Project homepage](https://mattkeeter.com/projects/futureproof)
 
 ## Project status
-![Project frozen](https://img.shields.io/badge/status-frozen-blue.svg) ![Project unmaintained](https://img.shields.io/badge/project-unmaintained-red.svg)
+![Project done](https://img.shields.io/badge/status-done-blue.svg) ![Project unmaintained](https://img.shields.io/badge/project-unmaintained-red.svg)
 
 This project is **done**, and I don't plan to maintain it in the future.
 

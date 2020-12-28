@@ -1,7 +1,7 @@
 ## About
 *Futureproof* is a live editor for GPU shaders, built on Zig, Neovim, and WebGPU.
 
-![Seascape](https://www.mattkeeter.com/projects/futureproof/seascape.png)
+![Seascape](https://www.mattkeeter.com/projects/futureproof/seascape@2x.png)
 
 [Project homepage](https://mattkeeter.com/projects/futureproof)
 

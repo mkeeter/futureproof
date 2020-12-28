@@ -228,11 +228,12 @@ pub fn build_preview_shader(
 
             if (num_end >= num_start + 2) {
                 // Error message with line attached
-                const line_num = try std.fmt.parseInt(u32, line[(num_start + 1)..(num_end - 1)], 10);
+                var line_num = try std.fmt.parseInt(u32, line[(num_start + 1)..(num_end - 1)], 10);
+                line_num = if (line_num < prelude_newlines) 1 else (line_num - prelude_newlines);
                 const line_msg = try alloc.dupe(u8, line[(num_end + 1)..]);
                 try errs.append(.{
                     .msg = line_msg,
-                    .line = line_num - prelude_newlines,
+                    .line = line_num,
                 });
             } else {
                 const line_msg = try alloc.dupe(u8, line[(num_start + 2)..]);

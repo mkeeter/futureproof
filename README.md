@@ -5,6 +5,22 @@
 
 [Project homepage](https://mattkeeter.com/projects/futureproof)
 
+## Project status
+![Project frozen](https://img.shields.io/badge/status-frozen-blue.svg) ![Project unmaintained](https://img.shields.io/badge/project-unmaintained-red.svg)
+
+This project is **done**, and I don't plan to maintain it in the future.
+
+It is only claimed to work on my laptop,
+and even then,
+will probably break if the Zig compiler version changes.
+
+I'm unlikely to fix any issues,
+although I will optimistically merge small-to-medium PRs that fix bugs
+or add support for more platforms.
+
+If you'd like to add major features, please fork the project;
+I'd be happy to link to any forks which achieve critical momemtum!
+
 ## License
 
 Licensed under either of

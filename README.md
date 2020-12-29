@@ -6,7 +6,7 @@
 [Project homepage](https://mattkeeter.com/projects/futureproof)
 
 ## Building
-### macOS
+### macOS (x86)
 Install `freetype` and `glfw3` through [Homebrew](https://brew.sh):
 ```
 brew install freetype glfw3

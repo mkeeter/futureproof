@@ -2,14 +2,13 @@
 // in both C / Zig and GLSL.  It allows headers to work around missing
 // sized integer types (in GLSL), vec types (in C), and slightly different
 // handling of struct naming (using the MEMBER_STRUCT macro).
-#pragma once
-
 #if GL_core_profile // Compiling as GLSL
 #define uint32_t uint
 #define int32_t int
 #define MEMBER_STRUCT
 
 #else // Compiling as a C header file
+#pragma once
 #include <stdint.h>
 #define MEMBER_STRUCT struct
 typedef struct {

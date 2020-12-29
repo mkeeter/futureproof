@@ -5,6 +5,30 @@
 
 [Project homepage](https://mattkeeter.com/projects/futureproof)
 
+## Building
+### macOS
+Install `freetype` and `glfw3` through [Homebrew](https://brew.sh):
+```
+brew install freetype glfw3
+```
+
+Get vendored dependencies:
+```
+cd futureproof/vendor
+make wgpu shaderc
+```
+
+Build using Zig:
+```
+cd futureproof
+zig build run
+```
+
+(You may need `env ZIG_SYSTEM_LINKER_HACK=1`, depending on Zig compiler version)
+
+### Other OS
+Good luck - open a PR if you get things working!
+
 ## Project status
 ![Project done](https://img.shields.io/badge/status-done-blue.svg) ![Project unmaintained](https://img.shields.io/badge/project-unmaintained-red.svg)
 

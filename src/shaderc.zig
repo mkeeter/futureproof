@@ -276,7 +276,6 @@ pub fn build_preview_shader(
             }
             start += next + 1;
         }
-        std.debug.print("Has iTime: {}\n", .{has_time});
         return Result{
             .Shader = .{ .spirv = out, .has_time = has_time },
         };

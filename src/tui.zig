@@ -562,14 +562,24 @@ pub const Tui = struct {
             self.renderer.update_uniforms(&self.u);
         }
 
-        if (self.debounce.check()) |buf_num| {
-            // Check that the target buffer hasn't been deleted during the
-            // debouncing delay time.  If it exists, then try to compile
-            // it as a shader and load it into the preview pane.
-            if (self.buffers.get(buf_num)) |buf| {
-                const shader_text = try buf.to_buf();
-                defer self.alloc.free(shader_text);
-                try self.rebuild_preview(buf_num, shader_text);
+        // Work around a potential deadlock: if nvim is in a blocking mode,
+        // then we can't use nvim_command, so we defer handling the shaders
+        // until then.
+        const mode = (try self.rpc.call("nvim_get_mode", .{}));
+        defer self.rpc.release(mode);
+        const key = msgpack.Key{ .RawString = "blocking" };
+        const blocking = mode.Map.get(key) orelse
+            std.debug.panic("Could not get 'blocking'", .{});
+        if (!blocking.Boolean) {
+            if (self.debounce.check()) |buf_num| {
+                // Check that the target buffer hasn't been deleted during the
+                // debouncing delay time.  If it exists, then try to compile
+                // it as a shader and load it into the preview pane.
+                if (self.buffers.get(buf_num)) |buf| {
+                    const shader_text = try buf.to_buf();
+                    defer self.alloc.free(shader_text);
+                    try self.rebuild_preview(buf_num, shader_text);
+                }
             }
         }
 

@@ -252,7 +252,31 @@ pub fn build_preview_shader(
         const out = try alloc.alloc(u32, len / 4);
         @memcpy(@ptrCast([*]u8, out.ptr), c.shaderc_result_get_bytes(result), len);
 
-        const has_time = std.mem.indexOf(u8, src, "iTime") != null;
+        // Find the text "iTime" in the script, then walk backwards until you
+        // see the either the beginning of the line or a comment (//)
+        //
+        // This prevents the template from running, though folks could still
+        // put iTime into a /* ... */ block, which would falsely trigger
+        // continously-running mode.
+        var has_time = false;
+        var start: usize = 0;
+        while (std.mem.indexOf(u8, src[start..], "iTime")) |next| {
+            has_time = true;
+            var i = next;
+            while (i > 0) : (i -= 1) {
+                if (src[start + i] == '\n') {
+                    break;
+                } else if (src[start + i - 1] == '/' and src[start + i] == '/') {
+                    has_time = false;
+                    break;
+                }
+            }
+            if (has_time) {
+                break;
+            }
+            start += next + 1;
+        }
+        std.debug.print("Has iTime: {}\n", .{has_time});
         return Result{
             .Shader = .{ .spirv = out, .has_time = has_time },
         };

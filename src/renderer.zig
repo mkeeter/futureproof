@@ -52,8 +52,9 @@ pub const Renderer = struct {
             //  id metal_layer = [CAMetalLayer layer];
             //  [ns_window.contentView setLayer:metal_layer];
             const objc = @import("objc.zig");
+            const darwin = @import("darwin.zig");
 
-            const cocoa_window = objc.glfwGetCocoaWindow(window);
+            const cocoa_window = darwin.glfwGetCocoaWindow(window);
             const ns_window = @ptrCast(c.id, @alignCast(8, cocoa_window));
 
             const cv = objc.call(ns_window, "contentView");

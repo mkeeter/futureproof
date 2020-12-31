@@ -174,6 +174,14 @@ pub const Tui = struct {
             try rpc.call_release("nvim_subscribe", .{"Fp"});
         }
 
+        // Tell Vim to save the default undo levels in a variable, then
+        // set them to -1 (so that loading the template doesn't end up
+        // in the undo list)
+        try rpc.call_release(
+            "nvim_input",
+            .{":let old_undolevels = &undolevels<Enter>:set undolevels=-1<Enter>"},
+        );
+
         { // Send the template text to the first buffer
             const src = try util.file_contents(
                 tmp_alloc,
@@ -207,6 +215,12 @@ pub const Tui = struct {
         try rpc.call_release(
             "nvim_input",
             .{"ddgg:set filetype=glsl<Enter>:setlocal nomodified<Enter>"},
+        );
+
+        // Re-enable undo by restoring default undo levels
+        try rpc.call_release(
+            "nvim_input",
+            .{":let &undolevels = old_undolevels<Enter>:unlet old_undolevels<Enter>"},
         );
 
         out.update_size(width, height);

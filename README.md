@@ -18,7 +18,7 @@ cd futureproof/vendor
 make wgpu shaderc
 ```
 
-Build using Zig:
+Build using Zig, using a recent [nightly build](https://ziglang.org/download/) (0.7.1, after 2020-12-31)
 ```
 cd futureproof
 zig build run

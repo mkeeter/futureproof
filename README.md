@@ -43,7 +43,7 @@ although I will optimistically merge small-to-medium PRs that fix bugs
 or add support for more platforms.
 
 If you'd like to add major features, please fork the project;
-I'd be happy to link to any forks which achieve critical momemtum!
+I'd be happy to link to any forks which achieve critical momentum!
 
 ## License
 

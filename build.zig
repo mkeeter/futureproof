@@ -37,6 +37,10 @@ pub fn build(b: *Builder) void {
         exe.addFrameworkDir("/System/Library/Frameworks");
         exe.linkFramework("Foundation");
         exe.linkFramework("AppKit");
+        // not needed, ended up symlinking OpenGL headers to /usr/local/include
+        // ln -s /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers/ /usr/local/include/OpenGL
+        // exe.addFrameworkDir("/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks");
+        // exe.linkFramework("OpenGL");
     }
 
     const run_cmd = exe.run();

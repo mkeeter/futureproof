@@ -9,10 +9,10 @@ pub fn Debounce(comptime T: type, dt_ms: i64) type {
     return struct {
         const Self = @This();
 
-        thread: ?*std.Thread,
+        thread: ?std.Thread,
 
         // The mutex protects all of the variables below
-        mutex: std.Mutex,
+        mutex: std.Thread.Mutex,
         end_time_ms: i64,
         thread_running: bool,
         next: T,
@@ -20,7 +20,7 @@ pub fn Debounce(comptime T: type, dt_ms: i64) type {
 
         pub fn init() Self {
             return Self{
-                .mutex = std.Mutex{},
+                .mutex = std.Thread.Mutex{},
 
                 .end_time_ms = 0,
                 .thread = null,
@@ -59,9 +59,9 @@ pub fn Debounce(comptime T: type, dt_ms: i64) type {
             self.end_time_ms = std.time.milliTimestamp() + dt_ms;
             if (!self.thread_running) {
                 if (self.thread) |thread| {
-                    thread.wait();
+                    thread.join();
                 }
-                self.thread = try std.Thread.spawn(self, Self.run);
+                self.thread = try std.Thread.spawn(.{}, Self.run, .{self});
                 self.thread_running = true;
             } else {
                 // The already-running thread will handle it

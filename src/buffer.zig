@@ -118,16 +118,18 @@ pub const Buffer = struct {
     // This API event is the only one which returns 'true', indicating
     // that the buffer should be destroyed
     fn api_detach_event(self: *Buffer, args: []const msgpack.Value) !Status {
+        _ = self;
+        _ = args;
         return Status.Done;
     }
 
     pub fn rpc_method(self: *Buffer, name: []const u8, args: []const msgpack.Value) !Status {
         // Same trick as in tui.zig
-        comptime const opts = std.builtin.CallOptions{};
+        const opts = comptime std.builtin.CallOptions{};
         inline for (@typeInfo(Self).Struct.decls) |s| {
             // This conditional should be optimized out, since
             // it's known at comptime.
-            comptime const is_api = std.mem.startsWith(u8, s.name, "api_");
+            const is_api = comptime std.mem.startsWith(u8, s.name, "api_");
             if (is_api) {
                 // Skip nvim_buf_ in the RPC name and api_ in the API name
                 if (std.mem.eql(u8, name[9..], s.name[4..])) {
@@ -135,7 +137,7 @@ pub const Buffer = struct {
                 }
             }
         }
-        std.debug.warn("[Buffer] Unimplemented API: {}\n", .{name});
+        std.debug.warn("[Buffer] Unimplemented API: {s}\n", .{name});
         return Status.Okay;
     }
 };

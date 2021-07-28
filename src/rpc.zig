@@ -30,6 +30,10 @@ const Listener = struct {
             var offset: usize = 0;
             while (offset != in) {
                 const v = try msgpack.decode(self.alloc, buf[offset..in]);
+                if (v.data.Array[0] == .RawString) {
+                    std.debug.print("{s}\n", .{v.data.Array[0].RawString});
+                    return;
+                }
                 if (v.data.Array[0].UInt == RPC_TYPE_RESPONSE) {
                     try self.response_queue.put(v.data);
                 } else if (v.data.Array[0].UInt == RPC_TYPE_NOTIFICATION) {
@@ -50,7 +54,7 @@ pub const RPC = struct {
 
     output: std.fs.File.Writer, // This is the stdin of the RPC subprocess
     process: *std.ChildProcess,
-    thread: *std.Thread,
+    thread: std.Thread,
     alloc: *std.mem.Allocator,
     msgid: u32,
 
@@ -70,7 +74,7 @@ pub const RPC = struct {
             .alloc = alloc,
         };
 
-        const thread = try std.Thread.spawn(listener, Listener.run);
+        const thread = try std.Thread.spawn(.{}, Listener.run, .{listener});
 
         const rpc = .{
             .listener = listener,
@@ -117,7 +121,7 @@ pub const RPC = struct {
         // Check for error responses
         const err = response.Array[2];
         const result = response.Array[3];
-        if (err != @TagType(msgpack.Value).Nil) {
+        if (err != std.meta.TagType(msgpack.Value).Nil) {
             // TODO: handle error here
             std.debug.panic("Got error in msgpack-rpc call: {}\n", .{err.Array[1]});
         }
@@ -139,7 +143,7 @@ pub const RPC = struct {
         (self.process.stdin orelse unreachable).close();
         self.process.stdin = null;
         const term = try self.process.wait();
-        self.thread.wait();
+        self.thread.join();
 
         // Flush out the queue to avoid memory leaks
         while (self.get_event()) |event| {

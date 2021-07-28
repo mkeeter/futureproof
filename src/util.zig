@@ -13,7 +13,7 @@ pub fn file_contents(alloc: *std.mem.Allocator, comptime name: []const u8) ![]co
             return buf;
         },
         .ReleaseSafe, .ReleaseFast, .ReleaseSmall => {
-            comptime const f = @embedFile("../" ++ name);
+            const f = @embedFile("../" ++ name);
             return f[0..];
         },
     }

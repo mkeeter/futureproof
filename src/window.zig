@@ -16,7 +16,7 @@ pub const Window = struct {
         } else {
             var err_str: [*c]u8 = null;
             const err = c.glfwGetError(&err_str);
-            std.debug.panic("Failed to open window: {} ({})", .{ err, err_str });
+            std.debug.panic("Failed to open window: {} ({s})", .{ err, err_str });
         }
     }
 

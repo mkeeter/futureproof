@@ -5,15 +5,15 @@ const std = @import("std");
 pub fn BlockingQueue(comptime T: type) type {
     return struct {
         inner: std.atomic.Queue(T),
-        event: std.ResetEvent,
+        event: std.Thread.ResetEvent,
         alloc: *std.mem.Allocator,
 
         pub const Self = @This();
 
         pub fn init(alloc: *std.mem.Allocator) Self {
-            var event: std.ResetEvent = undefined;
-            std.ResetEvent.init(&event) catch |err| {
-                std.debug.panic("Failed to initialize event: {}\n", .{err});
+            var event: std.Thread.ResetEvent = undefined;
+            std.Thread.ResetEvent.init(&event) catch |err| {
+                std.debug.panic("Failed to initialize event: {s}\n", .{err});
             };
             return .{
                 .inner = std.atomic.Queue(T).init(),

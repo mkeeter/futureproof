@@ -25,18 +25,6 @@ pub const Key = union(enum) {
         };
     }
 
-    fn eql(a: Key, b: Key) bool {
-        if (@as(@TagType(Key), a) != b) {
-            return false;
-        } else {
-            return std.mem.eql(u8, a.bytes(), b.bytes());
-        }
-    }
-
-    fn hash(self: Key) u64 {
-        return std.hash.Wyhash.hash(0, self.bytes());
-    }
-
     fn to_value(self: Key) Value {
         return switch (self) {
             .Int => Value{ .Int = self.Int },
@@ -48,11 +36,24 @@ pub const Key = union(enum) {
     }
 };
 
+const Context = struct {
+    pub fn eql(_: Context, a: Key, b: Key) bool {
+        if (@as(std.meta.TagType(Key), a) != b) {
+            return false;
+        } else {
+            return std.mem.eql(u8, a.bytes(), b.bytes());
+        }
+    }
+
+    pub fn hash(_: Context, key: Key) u64 {
+        return std.hash.Wyhash.hash(0, key.bytes());
+    }
+};
+
 pub const KeyValueMap = std.hash_map.HashMap(
     Key,
     Value,
-    Key.hash,
-    Key.eql,
+    Context,
     std.hash_map.DefaultMaxLoadPercentage,
 );
 
@@ -94,8 +95,8 @@ pub const Value = union(enum) {
             .Map => |map| {
                 var itr = map.iterator();
                 while (itr.next()) |entry| {
-                    entry.key.to_value().destroy(alloc);
-                    entry.value.destroy(alloc);
+                    alloc.destroy(entry.key_ptr);
+                    alloc.destroy(entry.value_ptr);
                 }
                 self_mut.Map.deinit();
             },
@@ -383,8 +384,8 @@ pub const Value = union(enum) {
                 }
                 var itr = m.iterator();
                 while (itr.next()) |entry| {
-                    try entry.key.to_value().serialize(out);
-                    try entry.value.serialize(out);
+                    try entry.key_ptr.to_value().serialize(out);
+                    try entry.value_ptr.serialize(out);
                 }
             },
 

@@ -17,7 +17,7 @@ const CompilationError = error{
 
     UnknownError,
 };
-fn status_to_err(i: c_int) CompilationError {
+fn status_to_err(i: c_uint) CompilationError {
     switch (i) {
         c.shaderc_compilation_status_invalid_stage => return CompilationError.InvalidStage,
         c.shaderc_compilation_status_compilation_error => return CompilationError.CompilationError,
@@ -32,6 +32,9 @@ fn status_to_err(i: c_int) CompilationError {
 }
 
 export fn include_cb(user_data: ?*c_void, requested_source: [*c]const u8, include_type: c_int, requesting_source: [*c]const u8, include_depth: usize) *c.shaderc_include_result {
+    _ = include_type;
+    _ = requesting_source;
+    _ = include_depth;
     const alloc = @ptrCast(*std.mem.Allocator, @alignCast(8, user_data));
     var out = alloc.create(c.shaderc_include_result) catch |err| {
         std.debug.panic("Could not allocate shaderc_include_result: {}", .{err});
@@ -100,17 +103,17 @@ pub fn build_shader(alloc: *std.mem.Allocator, name: []const u8, src: []const u8
         compiler,
         src.ptr,
         src.len,
-        c.shaderc_shader_kind.shaderc_glsl_infer_from_source,
+        c.shaderc_glsl_infer_from_source,
         name.ptr,
         "main",
         options,
     );
     defer c.shaderc_result_release(result);
     const r = c.shaderc_result_get_compilation_status(result);
-    if (@enumToInt(r) != c.shaderc_compilation_status_success) {
+    if (r != c.shaderc_compilation_status_success) {
         const err = c.shaderc_result_get_error_message(result);
         std.debug.warn("Shader error: {} {s}\n", .{ r, err });
-        return status_to_err(@enumToInt(r));
+        return status_to_err(r);
     }
 
     // Copy the result out of the shader
@@ -186,7 +189,7 @@ pub fn build_preview_shader(
         compiler,
         full_src.ptr,
         full_src.len,
-        c.shaderc_shader_kind.shaderc_glsl_fragment_shader,
+        c.shaderc_glsl_fragment_shader,
         "preview",
         "main",
         options,
@@ -194,7 +197,7 @@ pub fn build_preview_shader(
     defer c.shaderc_result_release(result);
 
     const r = c.shaderc_result_get_compilation_status(result);
-    if (@enumToInt(r) != c.shaderc_compilation_status_success) {
+    if (r != c.shaderc_compilation_status_success) {
         var start: usize = 0;
         var prelude_newlines: u32 = 0;
         while (std.mem.indexOf(u8, prelude[start..], "\n")) |end| {

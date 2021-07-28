@@ -29,7 +29,7 @@ pub const Atlas = struct {
 
     pub fn deinit(self: *Self) void {
         status_to_err(c.FT_Done_FreeType(self.ft)) catch |err| {
-            std.debug.panic("Could not destroy library: {}", .{err});
+            std.debug.panic("Could not destroy library: {s}", .{err});
         };
         self.alloc.free(self.tex);
         self.table.deinit(self.alloc);
@@ -59,7 +59,7 @@ pub const Atlas = struct {
         ));
         try status_to_err(c.FT_Render_Glyph(
             self.face.*.glyph,
-            c.FT_Render_Mode.FT_RENDER_MODE_LCD,
+            c.FT_RENDER_MODE_LCD,
         ));
         const glyph = self.face.*.glyph;
         const bmp = &(glyph.*.bitmap);
@@ -139,7 +139,7 @@ pub fn build_atlas(
         .ft = undefined,
         .face = undefined,
 
-        .table = std.hash_map.AutoHashMapUnmanaged(u32, u32).init(alloc),
+        .table = .{},
 
         // GPU uniforms
         .u = undefined,

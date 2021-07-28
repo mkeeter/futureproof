@@ -6,7 +6,7 @@ const Tui = @import("tui.zig").Tui;
 
 pub fn main() anyerror!void {
     var gp_alloc = std.heap.GeneralPurposeAllocator(.{}){};
-    defer std.testing.expect(!gp_alloc.deinit());
+    defer _ = gp_alloc.deinit();
     const alloc: *std.mem.Allocator = &gp_alloc.allocator;
 
     if (c.glfwInit() != c.GLFW_TRUE) {

@@ -5,9 +5,13 @@ const msgpack = @import("msgpack.zig");
 const Tui = @import("tui.zig").Tui;
 
 pub fn main() anyerror!void {
-    var gp_alloc = std.heap.GeneralPurposeAllocator(.{}){};
-    defer std.testing.expect(!gp_alloc.deinit());
-    const alloc: *std.mem.Allocator = &gp_alloc.allocator;
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        const leaked = gpa.deinit();
+        if (leaked) std.debug.print("leaked", .{});
+    }
+
+    const alloc = gpa.allocator();
 
     if (c.glfwInit() != c.GLFW_TRUE) {
         std.debug.panic("Could not initialize glfw", .{});

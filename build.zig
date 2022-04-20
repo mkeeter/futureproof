@@ -1,6 +1,7 @@
-const Builder = @import("std").build.Builder;
+const std = @import("std");
+const Builder = std.build.Builder;
 
-pub fn build(b: *Builder) void {
+pub fn build(b: *Builder) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -19,6 +20,9 @@ pub fn build(b: *Builder) void {
     exe.linkSystemLibrary("glfw3");
     exe.linkSystemLibrary("freetype2");
     exe.linkSystemLibrary("stdc++"); // needed for shaderc
+    exe.linkSystemLibrary("png");
+    exe.linkSystemLibrary("z");
+    exe.linkSystemLibrary("bz2");
 
     exe.addLibPath("vendor/wgpu");
     exe.linkSystemLibrary("wgpu_native");
@@ -34,7 +38,8 @@ pub fn build(b: *Builder) void {
     exe.install();
 
     if (exe.target.isDarwin()) {
-        exe.addFrameworkDir("/System/Library/Frameworks");
+        exe.addFrameworkDir(try getMacFrameworksDir(b));
+        //exe.addFrameworkDir("/System/Library/Frameworks");
         exe.linkFramework("Foundation");
         exe.linkFramework("AppKit");
     }
@@ -44,4 +49,14 @@ pub fn build(b: *Builder) void {
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
+}
+
+// https://github.com/ziglang/zig/issues/2208
+fn getMacFrameworksDir(b: *Builder) ![]u8 {
+    const sdk = try b.exec(&[_][]const u8{ "xcrun", "-show-sdk-path" });
+    const parts = &[_][]const u8{
+        std.mem.trimRight(u8, sdk, "\n"),
+        "/System/Library/Frameworks",
+    };
+    return std.mem.concat(b.allocator, u8, parts);
 }

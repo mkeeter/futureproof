@@ -14,15 +14,16 @@ pub const Blit = struct {
 
     render_pipeline: c.WGPURenderPipelineId,
 
-    pub fn init(alloc: *std.mem.Allocator, device: c.WGPUDeviceId) !Blit {
+    pub fn init(alloc: std.mem.Allocator, device: c.WGPUDeviceId) !Blit {
         var arena = std.heap.ArenaAllocator.init(alloc);
-        const tmp_alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
+
+        var tmp_alloc = &arena.allocator();
 
         ////////////////////////////////////////////////////////////////////////////
         // Build the shaders using shaderc
         const vert_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/blit.vert") catch |err| {
-            std.debug.panic("Could not open file", .{});
+            std.debug.panic("Could not open file: {}", .{err});
         };
         const vert_shader = c.wgpu_device_create_shader_module(
             device,
@@ -34,7 +35,7 @@ pub const Blit = struct {
         defer c.wgpu_shader_module_destroy(vert_shader);
 
         const frag_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/blit.frag") catch |err| {
-            std.debug.panic("Could not open file", .{});
+            std.debug.panic("Could not open file: {}", .{err});
         };
         const frag_shader = c.wgpu_device_create_shader_module(
             device,
@@ -50,15 +51,15 @@ pub const Blit = struct {
         const tex_sampler = c.wgpu_device_create_sampler(device, &(c.WGPUSamplerDescriptor){
             .next_in_chain = null,
             .label = "font_atlas_sampler",
-            .address_mode_u = c.WGPUAddressMode._ClampToEdge,
-            .address_mode_v = c.WGPUAddressMode._ClampToEdge,
-            .address_mode_w = c.WGPUAddressMode._ClampToEdge,
-            .mag_filter = c.WGPUFilterMode._Linear,
-            .min_filter = c.WGPUFilterMode._Nearest,
-            .mipmap_filter = c.WGPUFilterMode._Nearest,
+            .address_mode_u = c.WGPUAddressMode_ClampToEdge,
+            .address_mode_v = c.WGPUAddressMode_ClampToEdge,
+            .address_mode_w = c.WGPUAddressMode_ClampToEdge,
+            .mag_filter = c.WGPUFilterMode_Linear,
+            .min_filter = c.WGPUFilterMode_Nearest,
+            .mipmap_filter = c.WGPUFilterMode_Nearest,
             .lod_min_clamp = 0.0,
             .lod_max_clamp = std.math.f32_max,
-            .compare = c.WGPUCompareFunction._Undefined,
+            .compare = c.WGPUCompareFunction_Undefined,
         });
 
         ////////////////////////////////////////////////////////////////////////////
@@ -68,12 +69,10 @@ pub const Blit = struct {
                 .binding = 0,
                 .visibility = c.WGPUShaderStage_FRAGMENT,
                 .ty = c.WGPUBindingType_SampledTexture,
-
                 .multisampled = false,
-                .view_dimension = c.WGPUTextureViewDimension._D2,
-                .texture_component_type = c.WGPUTextureComponentType._Uint,
-                .storage_texture_format = c.WGPUTextureFormat._Bgra8Unorm,
-
+                .view_dimension = c.WGPUTextureViewDimension_D2,
+                .texture_component_type = c.WGPUTextureComponentType_Uint,
+                .storage_texture_format = c.WGPUTextureFormat_Bgra8Unorm,
                 .count = undefined,
                 .has_dynamic_offset = undefined,
                 .min_buffer_binding_size = undefined,
@@ -82,7 +81,6 @@ pub const Blit = struct {
                 .binding = 1,
                 .visibility = c.WGPUShaderStage_FRAGMENT,
                 .ty = c.WGPUBindingType_Sampler,
-
                 .multisampled = undefined,
                 .view_dimension = undefined,
                 .texture_component_type = undefined,
@@ -126,31 +124,31 @@ pub const Blit = struct {
                     .entry_point = "main",
                 },
                 .rasterization_state = &(c.WGPURasterizationStateDescriptor){
-                    .front_face = c.WGPUFrontFace._Ccw,
-                    .cull_mode = c.WGPUCullMode._None,
+                    .front_face = c.WGPUFrontFace_Ccw,
+                    .cull_mode = c.WGPUCullMode_None,
                     .depth_bias = 0,
                     .depth_bias_slope_scale = 0.0,
                     .depth_bias_clamp = 0.0,
                 },
-                .primitive_topology = c.WGPUPrimitiveTopology._TriangleList,
+                .primitive_topology = c.WGPUPrimitiveTopology_TriangleList,
                 .color_states = &(c.WGPUColorStateDescriptor){
-                    .format = c.WGPUTextureFormat._Bgra8Unorm,
+                    .format = c.WGPUTextureFormat_Bgra8Unorm,
                     .alpha_blend = (c.WGPUBlendDescriptor){
-                        .src_factor = c.WGPUBlendFactor._One,
-                        .dst_factor = c.WGPUBlendFactor._Zero,
-                        .operation = c.WGPUBlendOperation._Add,
+                        .src_factor = c.WGPUBlendFactor_One,
+                        .dst_factor = c.WGPUBlendFactor_Zero,
+                        .operation = c.WGPUBlendOperation_Add,
                     },
                     .color_blend = (c.WGPUBlendDescriptor){
-                        .src_factor = c.WGPUBlendFactor._One,
-                        .dst_factor = c.WGPUBlendFactor._Zero,
-                        .operation = c.WGPUBlendOperation._Add,
+                        .src_factor = c.WGPUBlendFactor_One,
+                        .dst_factor = c.WGPUBlendFactor_Zero,
+                        .operation = c.WGPUBlendOperation_Add,
                     },
                     .write_mask = c.WGPUColorWrite_ALL,
                 },
                 .color_states_length = 1,
                 .depth_stencil_state = null,
                 .vertex_state = (c.WGPUVertexStateDescriptor){
-                    .index_format = c.WGPUIndexFormat._Uint16,
+                    .index_format = c.WGPUIndexFormat_Uint16,
                     .vertex_buffers = null,
                     .vertex_buffers_length = 0,
                 },
@@ -179,7 +177,6 @@ pub const Blit = struct {
                 .texture_view = tex_view,
                 .sampler = 0, // None
                 .buffer = 0, // None
-
                 .offset = undefined,
                 .size = undefined,
             },
@@ -188,7 +185,6 @@ pub const Blit = struct {
                 .sampler = self.tex_sampler,
                 .texture_view = 0, // None
                 .buffer = 0, // None
-
                 .offset = undefined,
                 .size = undefined,
             },
@@ -222,8 +218,8 @@ pub const Blit = struct {
                 .attachment = next_texture.view_id,
                 .resolve_target = 0,
                 .channel = (c.WGPUPassChannel_Color){
-                    .load_op = c.WGPULoadOp._Load,
-                    .store_op = c.WGPUStoreOp._Store,
+                    .load_op = c.WGPULoadOp_Load,
+                    .store_op = c.WGPUStoreOp_Store,
                     .clear_value = (c.WGPUColor){
                         .r = 0.0,
                         .g = 0.0,

@@ -4,7 +4,7 @@ const c = @import("c.zig");
 pub const Atlas = struct {
     const Self = @This();
 
-    alloc: *std.mem.Allocator,
+    alloc: std.mem.Allocator,
 
     // Font atlas texture
     tex: []u32,
@@ -50,7 +50,7 @@ pub const Atlas = struct {
 
         const char_index = c.FT_Get_Char_Index(self.face, codepoint);
         if (char_index == 0) {
-            std.debug.warn("Could not get char for codepoint {x}\n", .{codepoint});
+            std.debug.print("Could not get char for codepoint {x}\n", .{codepoint});
         }
         try status_to_err(c.FT_Load_Glyph(
             self.face,
@@ -59,7 +59,8 @@ pub const Atlas = struct {
         ));
         try status_to_err(c.FT_Render_Glyph(
             self.face.*.glyph,
-            c.FT_Render_Mode.FT_RENDER_MODE_LCD,
+            //c.FT_Render_Mode.FT_RENDER_MODE_LCD,
+            c.FT_RENDER_MODE_LCD,
         ));
         const glyph = self.face.*.glyph;
         const bmp = &(glyph.*.bitmap);
@@ -116,7 +117,7 @@ pub const Atlas = struct {
 };
 
 pub fn build_atlas(
-    alloc: *std.mem.Allocator,
+    alloc: std.mem.Allocator,
     comptime font_name: []const u8,
     font_size: u32,
     tex_size: u32,
@@ -139,7 +140,7 @@ pub fn build_atlas(
         .ft = undefined,
         .face = undefined,
 
-        .table = std.hash_map.AutoHashMapUnmanaged(u32, u32).init(alloc),
+        .table = std.hash_map.AutoHashMapUnmanaged(u32, u32){},
 
         // GPU uniforms
         .u = undefined,

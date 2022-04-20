@@ -1,7 +1,7 @@
 const c = @import("c.zig");
 
 pub fn class(s: [*c]const u8) c.id {
-    return @ptrCast(c.id, c.objc_lookUpClass(s));
+    return @ptrCast(c.id, @alignCast(@alignOf(c.id), c.objc_lookUpClass(s)));
 }
 
 pub fn call(obj: c.id, sel_name: [*c]const u8) c.id {

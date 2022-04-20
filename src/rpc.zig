@@ -16,7 +16,7 @@ const Listener = struct {
     input: std.fs.File.Reader, // This is the stdout of the RPC subprocess
     event_queue: RPCQueue,
     response_queue: RPCQueue,
-    alloc: *std.mem.Allocator,
+    alloc: std.mem.Allocator,
 
     fn run(self: *Listener) !void {
         var buf: [1024 * 1024]u8 = undefined;
@@ -50,11 +50,11 @@ pub const RPC = struct {
 
     output: std.fs.File.Writer, // This is the stdin of the RPC subprocess
     process: *std.ChildProcess,
-    thread: *std.Thread,
-    alloc: *std.mem.Allocator,
+    thread: std.Thread,
+    alloc: std.mem.Allocator,
     msgid: u32,
 
-    pub fn init(argv: []const []const u8, alloc: *std.mem.Allocator) !RPC {
+    pub fn init(argv: []const []const u8, alloc: std.mem.Allocator) !RPC {
         const child = try std.ChildProcess.init(argv, alloc);
         child.stdin_behavior = .Pipe;
         child.stdout_behavior = .Pipe;
@@ -70,7 +70,7 @@ pub const RPC = struct {
             .alloc = alloc,
         };
 
-        const thread = try std.Thread.spawn(listener, Listener.run);
+        const thread = try std.Thread.spawn(.{}, Listener.run, .{listener});
 
         const rpc = .{
             .listener = listener,
@@ -98,8 +98,9 @@ pub const RPC = struct {
     pub fn call(self: *RPC, method: []const u8, params: anytype) !msgpack.Value {
         // We'll use an arena for the encoded message
         var arena = std.heap.ArenaAllocator.init(self.alloc);
-        const tmp_alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
+
+        const tmp_alloc = arena.allocator();
 
         // Push the serialized call to the subprocess's stdin
         const p = try msgpack.Value.encode(tmp_alloc, params);
@@ -117,7 +118,7 @@ pub const RPC = struct {
         // Check for error responses
         const err = response.Array[2];
         const result = response.Array[3];
-        if (err != @TagType(msgpack.Value).Nil) {
+        if (err != std.meta.Tag(msgpack.Value).Nil) {
             // TODO: handle error here
             std.debug.panic("Got error in msgpack-rpc call: {}\n", .{err.Array[1]});
         }
@@ -139,7 +140,7 @@ pub const RPC = struct {
         (self.process.stdin orelse unreachable).close();
         self.process.stdin = null;
         const term = try self.process.wait();
-        self.thread.wait();
+        self.thread.join();
 
         // Flush out the queue to avoid memory leaks
         while (self.get_event()) |event| {

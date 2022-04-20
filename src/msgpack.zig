@@ -25,18 +25,6 @@ pub const Key = union(enum) {
         };
     }
 
-    fn eql(a: Key, b: Key) bool {
-        if (@as(@TagType(Key), a) != b) {
-            return false;
-        } else {
-            return std.mem.eql(u8, a.bytes(), b.bytes());
-        }
-    }
-
-    fn hash(self: Key) u64 {
-        return std.hash.Wyhash.hash(0, self.bytes());
-    }
-
     fn to_value(self: Key) Value {
         return switch (self) {
             .Int => Value{ .Int = self.Int },
@@ -48,12 +36,29 @@ pub const Key = union(enum) {
     }
 };
 
+pub const KeyContext = struct {
+    pub fn eql(_: KeyContext, a: Key, b: Key) bool {
+        if (@as(std.meta.Tag(Key), a) != b) {
+            return false;
+        } else {
+            return std.mem.eql(u8, a.bytes(), b.bytes());
+        }
+    }
+
+    pub fn hash(_: KeyContext, x: Key) u64 {
+        return std.hash.Wyhash.hash(0, x.bytes());
+    }
+};
+
 pub const KeyValueMap = std.hash_map.HashMap(
     Key,
     Value,
-    Key.hash,
-    Key.eql,
-    std.hash_map.DefaultMaxLoadPercentage,
+    KeyContext,
+    //.{
+    //    Key.hash,
+    //    Key.eql,
+    //},
+    std.hash_map.default_max_load_percentage,
 );
 
 pub const Ext = struct {
@@ -88,14 +93,14 @@ pub const Value = union(enum) {
     Map: KeyValueMap,
     Ext: Ext,
 
-    pub fn destroy(self: Value, alloc: *std.mem.Allocator) void {
+    pub fn destroy(self: Value, alloc: std.mem.Allocator) void {
         var self_mut = self;
         switch (self_mut) {
             .Map => |map| {
                 var itr = map.iterator();
                 while (itr.next()) |entry| {
-                    entry.key.to_value().destroy(alloc);
-                    entry.value.destroy(alloc);
+                    entry.key_ptr.to_value().destroy(alloc);
+                    entry.value_ptr.destroy(alloc);
                 }
                 self_mut.Map.deinit();
             },
@@ -116,7 +121,7 @@ pub const Value = union(enum) {
         }
     }
 
-    pub fn encode(alloc: *std.mem.Allocator, v: anytype) !Value {
+    pub fn encode(alloc: std.mem.Allocator, v: anytype) !Value {
         const T = @TypeOf(v);
         switch (@typeInfo(T)) {
             .Pointer => |ptr| {
@@ -383,8 +388,8 @@ pub const Value = union(enum) {
                 }
                 var itr = m.iterator();
                 while (itr.next()) |entry| {
-                    try entry.key.to_value().serialize(out);
-                    try entry.value.serialize(out);
+                    try entry.key_ptr.to_value().serialize(out);
+                    try entry.value_ptr.serialize(out);
                 }
             },
 
@@ -454,7 +459,7 @@ fn decode_generic(comptime T: type, data: []const u8) !generic_type(T) {
     return generic_type(T){ .data = out, .offset = @sizeOf(T) };
 }
 
-fn decode_bin(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !Decoded {
+fn decode_bin(comptime T: type, alloc: std.mem.Allocator, data: []const u8) !Decoded {
     var offset: usize = 0;
     const d = try decode_generic(T, data);
     const n = d.data;
@@ -464,7 +469,7 @@ fn decode_bin(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !De
     return Decoded{ .data = Value{ .RawData = out }, .offset = offset };
 }
 
-fn decode_fixext(comptime len: u32, alloc: *std.mem.Allocator, data: []const u8) !Decoded {
+fn decode_fixext(comptime len: u32, alloc: std.mem.Allocator, data: []const u8) !Decoded {
     var offset: usize = 0;
     const t = @bitCast(i8, data[0]);
     offset += 1;
@@ -475,7 +480,7 @@ fn decode_fixext(comptime len: u32, alloc: *std.mem.Allocator, data: []const u8)
     };
 }
 
-fn decode_ext(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !Decoded {
+fn decode_ext(comptime T: type, alloc: std.mem.Allocator, data: []const u8) !Decoded {
     const t = @bitCast(i8, data[0]);
     var out = try decode_bin(T, alloc, data[1..]);
     return Decoded{
@@ -484,7 +489,7 @@ fn decode_ext(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !De
     };
 }
 
-fn decode_array_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decoded {
+fn decode_array_n(alloc: std.mem.Allocator, n: usize, data: []const u8) !Decoded {
     var out = try alloc.alloc(Value, n);
     var j: usize = 0;
     var offset: usize = 0;
@@ -499,7 +504,7 @@ fn decode_array_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decode
     };
 }
 
-fn decode_map_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decoded {
+fn decode_map_n(alloc: std.mem.Allocator, n: usize, data: []const u8) !Decoded {
     var out = KeyValueMap.init(alloc);
     var j: usize = 0;
     var offset: usize = 0;
@@ -518,7 +523,7 @@ fn decode_map_n(alloc: *std.mem.Allocator, n: usize, data: []const u8) !Decoded 
     };
 }
 
-fn decode_array(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !Decoded {
+fn decode_array(comptime T: type, alloc: std.mem.Allocator, data: []const u8) !Decoded {
     const d = try decode_generic(T, data);
     const n = d.data;
     const out = try decode_array_n(alloc, n, data[d.offset..]);
@@ -528,7 +533,7 @@ fn decode_array(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !
     };
 }
 
-fn decode_map(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !Decoded {
+fn decode_map(comptime T: type, alloc: std.mem.Allocator, data: []const u8) !Decoded {
     const d = try decode_generic(T, data);
     const n = d.data;
     const out = try decode_map_n(alloc, n, data[d.offset..]);
@@ -538,7 +543,7 @@ fn decode_map(comptime T: type, alloc: *std.mem.Allocator, data: []const u8) !De
     };
 }
 
-pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
+pub fn decode(alloc: std.mem.Allocator, data: []const u8) anyerror!Decoded {
     const c = data[0];
     var offset: usize = 1;
     const t = switch (c) {
@@ -726,11 +731,11 @@ pub fn decode(alloc: *std.mem.Allocator, data: []const u8) anyerror!Decoded {
 ////////////////////////////////////////////////////////////////////////////////
 
 test "msgpack.Value.encode string literal" {
-    var gp_alloc = std.heap.GeneralPurposeAllocator(.{}){};
-    defer std.testing.expect(!gp_alloc.deinit());
-    var arena = std.heap.ArenaAllocator.init(&gp_alloc.allocator);
-    const alloc: *std.mem.Allocator = &arena.allocator;
+    const tgpa = std.testing.allocator;
+
+    var arena = std.heap.ArenaAllocator.init(tgpa);
     defer arena.deinit();
+    const alloc = arena.allocator();
 
     const v = try Value.encode(alloc, "hello");
     std.testing.expect(v == .RawString);

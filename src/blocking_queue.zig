@@ -5,14 +5,14 @@ const std = @import("std");
 pub fn BlockingQueue(comptime T: type) type {
     return struct {
         inner: std.atomic.Queue(T),
-        event: std.ResetEvent,
-        alloc: *std.mem.Allocator,
+        event: std.Thread.ResetEvent,
+        alloc: std.mem.Allocator,
 
         pub const Self = @This();
 
-        pub fn init(alloc: *std.mem.Allocator) Self {
-            var event: std.ResetEvent = undefined;
-            std.ResetEvent.init(&event) catch |err| {
+        pub fn init(alloc: std.mem.Allocator) Self {
+            var event: std.Thread.ResetEvent = undefined;
+            std.Thread.ResetEvent.init(&event) catch |err| {
                 std.debug.panic("Failed to initialize event: {}\n", .{err});
             };
             return .{
@@ -44,8 +44,8 @@ pub fn BlockingQueue(comptime T: type) type {
         }
 
         fn check_flag(self: *Self) void {
-            const lock = self.inner.mutex.acquire();
-            defer lock.release();
+            self.inner.mutex.lock();
+            defer self.inner.mutex.unlock();
 
             // Manually check the state of the queue, as isEmpty() would
             // also try to lock the mutex, causing a deadlock

@@ -20,7 +20,7 @@ const SCROLL_THRESHOLD = 0.1;
 pub const Tui = struct {
     const Self = @This();
 
-    alloc: *std.mem.Allocator,
+    alloc: std.mem.Allocator,
 
     //  These are the three components to the Tui:
     //  - The window holds the GLFW window and handles resizing
@@ -60,8 +60,8 @@ pub const Tui = struct {
 
         var itr = self.buffers.iterator();
         while (itr.next()) |buf| {
-            buf.value.deinit();
-            self.alloc.destroy(buf.value);
+            buf.value_ptr.*.deinit();
+            self.alloc.destroy(buf.value_ptr);
         }
         self.buffers.deinit();
         c.shaderc_compiler_release(self.compiler);
@@ -80,11 +80,11 @@ pub const Tui = struct {
         try self.buffers.put(id, buf);
     }
 
-    pub fn init(alloc: *std.mem.Allocator) !*Self {
+    pub fn init(alloc: std.mem.Allocator) !*Self {
         // We'll use an arena for transient CPU-side resources
         var arena = std.heap.ArenaAllocator.init(alloc);
-        const tmp_alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
+        const tmp_alloc = arena.allocator();
 
         var width: c_int = 900;
         var height: c_int = 600;
@@ -152,7 +152,7 @@ pub const Tui = struct {
             mouse_button_cb,
             mouse_pos_cb,
             scroll_cb,
-            @ptrCast(?*c_void, out),
+            @ptrCast(?*anyopaque, out),
         );
 
         { // Attach the UI via RPC
@@ -364,28 +364,28 @@ pub const Tui = struct {
 
         var itr = attr.iterator();
         while (itr.next()) |entry| {
-            if (std.mem.eql(u8, entry.key.RawString, "foreground")) {
-                out.foreground = @intCast(u32, entry.value.UInt);
-            } else if (std.mem.eql(u8, entry.key.RawString, "background")) {
-                out.background = @intCast(u32, entry.value.UInt);
-            } else if (std.mem.eql(u8, entry.key.RawString, "special")) {
-                out.special = @intCast(u32, entry.value.UInt);
-            } else if (std.mem.eql(u8, entry.key.RawString, "bold") and entry.value.Boolean) {
+            if (std.mem.eql(u8, entry.key_ptr.RawString, "foreground")) {
+                out.foreground = @intCast(u32, entry.value_ptr.UInt);
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "background")) {
+                out.background = @intCast(u32, entry.value_ptr.UInt);
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "special")) {
+                out.special = @intCast(u32, entry.value_ptr.UInt);
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "bold") and entry.value_ptr.Boolean) {
                 out.flags |= c.FP_FLAG_BOLD;
-            } else if (std.mem.eql(u8, entry.key.RawString, "italic") and entry.value.Boolean) {
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "italic") and entry.value_ptr.Boolean) {
                 out.flags |= c.FP_FLAG_ITALIC;
-            } else if (std.mem.eql(u8, entry.key.RawString, "undercurl") and entry.value.Boolean) {
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "undercurl") and entry.value_ptr.Boolean) {
                 out.flags |= c.FP_FLAG_UNDERCURL;
-            } else if (std.mem.eql(u8, entry.key.RawString, "reverse") and entry.value.Boolean) {
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "reverse") and entry.value_ptr.Boolean) {
                 out.flags |= c.FP_FLAG_REVERSE;
-            } else if (std.mem.eql(u8, entry.key.RawString, "underline") and entry.value.Boolean) {
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "underline") and entry.value_ptr.Boolean) {
                 out.flags |= c.FP_FLAG_UNDERLINE;
-            } else if (std.mem.eql(u8, entry.key.RawString, "strikethrough") and entry.value.Boolean) {
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "strikethrough") and entry.value_ptr.Boolean) {
                 out.flags |= c.FP_FLAG_STRIKETHROUGH;
-            } else if (std.mem.eql(u8, entry.key.RawString, "standout") and entry.value.Boolean) {
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "standout") and entry.value_ptr.Boolean) {
                 out.flags |= c.FP_FLAG_STANDOUT;
             } else {
-                std.debug.warn("Unknown hlAttr: {} {}\n", .{ entry.key, entry.value });
+                std.debug.print("Unknown hlAttr: {} {}\n", .{ entry.key_ptr, entry.value_ptr });
             }
         }
         return out;
@@ -410,26 +410,26 @@ pub const Tui = struct {
         };
         var itr = mode.iterator();
         while (itr.next()) |entry| {
-            if (std.mem.eql(u8, entry.key.RawString, "cursor_shape")) {
-                if (std.mem.eql(u8, entry.value.RawString, "horizontal")) {
+            if (std.mem.eql(u8, entry.key_ptr.RawString, "cursor_shape")) {
+                if (std.mem.eql(u8, entry.value_ptr.RawString, "horizontal")) {
                     out.cursor_shape = c.FP_CURSOR_HORIZONTAL;
-                } else if (std.mem.eql(u8, entry.value.RawString, "vertical")) {
+                } else if (std.mem.eql(u8, entry.value_ptr.RawString, "vertical")) {
                     out.cursor_shape = c.FP_CURSOR_VERTICAL;
-                } else if (std.mem.eql(u8, entry.value.RawString, "block")) {
+                } else if (std.mem.eql(u8, entry.value_ptr.RawString, "block")) {
                     out.cursor_shape = c.FP_CURSOR_BLOCK;
                 } else {
-                    std.debug.panic("Unknown cursor shape: {}\n", .{entry.value});
+                    std.debug.panic("Unknown cursor shape: {}\n", .{entry.value_ptr});
                 }
-            } else if (std.mem.eql(u8, entry.key.RawString, "cell_percentage")) {
-                out.cell_percentage = @intCast(u32, entry.value.UInt);
-            } else if (std.mem.eql(u8, entry.key.RawString, "blinkwait")) {
-                out.blinkwait = @intCast(u32, entry.value.UInt);
-            } else if (std.mem.eql(u8, entry.key.RawString, "blinkon")) {
-                out.blinkon = @intCast(u32, entry.value.UInt);
-            } else if (std.mem.eql(u8, entry.key.RawString, "blinkoff")) {
-                out.blinkoff = @intCast(u32, entry.value.UInt);
-            } else if (std.mem.eql(u8, entry.key.RawString, "attr_id")) {
-                out.attr_id = @intCast(u32, entry.value.UInt);
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "cell_percentage")) {
+                out.cell_percentage = @intCast(u32, entry.value_ptr.UInt);
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "blinkwait")) {
+                out.blinkwait = @intCast(u32, entry.value_ptr.UInt);
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "blinkon")) {
+                out.blinkon = @intCast(u32, entry.value_ptr.UInt);
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "blinkoff")) {
+                out.blinkoff = @intCast(u32, entry.value_ptr.UInt);
+            } else if (std.mem.eql(u8, entry.key_ptr.RawString, "attr_id")) {
+                out.attr_id = @intCast(u32, entry.value_ptr.UInt);
             } else {
                 // Ignore other elements for now
             }
@@ -438,7 +438,7 @@ pub const Tui = struct {
     }
 
     fn api_mode_info_set(self: *Self, cmd: []const msgpack.Value) void {
-        const cursor_style_enabled = cmd[0].Boolean; // unused for now?
+        //const cursor_style_enabled = cmd[0].Boolean; // unused for now?
         std.debug.assert(cmd[1].Array.len < c.FP_MAX_MODES);
         var i: u32 = 0;
         while (i < cmd[1].Array.len) : (i += 1) {
@@ -479,10 +479,10 @@ pub const Tui = struct {
                     .Okay => {},
                 }
             } else {
-                std.debug.warn("Invalid buffer: {}\n", .{buf_num});
+                std.debug.print("Invalid buffer: {}\n", .{buf_num});
             }
         } else {
-            std.debug.warn("Unknown method target: {}\n", .{target.type});
+            std.debug.print("Unknown method target: {}\n", .{target.type});
         }
     }
 
@@ -496,11 +496,11 @@ pub const Tui = struct {
         const args = args_[1..];
 
         // Work around issue #4639 by storing opts in a variable
-        comptime const opts = std.builtin.CallOptions{};
+        const opts = comptime std.builtin.CallOptions{};
 
         inline for (@typeInfo(Self).Struct.decls) |s| {
             // Same trick as call_api
-            comptime const is_fp = std.mem.startsWith(u8, s.name, "fp_");
+            const is_fp = comptime std.mem.startsWith(u8, s.name, "fp_");
             if (is_fp) {
                 if (std.mem.eql(u8, name, s.name[3..])) {
                     return @call(
@@ -511,12 +511,12 @@ pub const Tui = struct {
                 }
             }
         }
-        std.debug.warn("[Tui] Unknown Fp event: {}\n", .{name});
+        std.debug.print("[Tui] Unknown Fp event: {s}\n", .{name});
     }
 
     fn call_api(self: *Self, event: []const msgpack.Value) !void {
         // Work around issue #4639 by storing opts in a variable
-        comptime const opts = std.builtin.CallOptions{};
+        const opts = comptime std.builtin.CallOptions{};
 
         // For each command in the incoming stream, try to match
         // it against a local api_XYZ declaration.
@@ -526,7 +526,7 @@ pub const Tui = struct {
             inline for (@typeInfo(Self).Struct.decls) |s| {
                 // This conditional should be optimized out, since
                 // it's known at comptime.
-                comptime const is_api = std.mem.startsWith(u8, s.name, "api_");
+                const is_api = comptime std.mem.startsWith(u8, s.name, "api_");
                 if (is_api) {
                     if (std.mem.eql(u8, api_name, s.name[4..])) {
                         for (cmd.Array[1..]) |v| {
@@ -542,7 +542,7 @@ pub const Tui = struct {
                 }
             }
             if (!matched) {
-                std.debug.warn("[Tui] Unimplemented API: {}\n", .{api_name});
+                std.debug.print("[Tui] Unimplemented API: {s}\n", .{api_name});
             }
         }
     }
@@ -623,8 +623,8 @@ pub const Tui = struct {
             },
             .Error => |e| {
                 var arena = std.heap.ArenaAllocator.init(self.alloc);
-                const tmp_alloc: *std.mem.Allocator = &arena.allocator;
                 defer arena.deinit();
+                const tmp_alloc = arena.allocator();
 
                 self.renderer.clear_preview(self.alloc);
 
@@ -646,7 +646,7 @@ pub const Tui = struct {
 
                     const lexp = try std.fmt.allocPrint(
                         tmp_alloc,
-                        ":ladd \"{}:{}\"",
+                        ":ladd \"{}:{s}\"",
                         .{ line_num, line_err.msg },
                     );
                     try self.rpc.call_release("nvim_command", .{lexp});
@@ -832,21 +832,21 @@ pub const Tui = struct {
 
     // Helper function to convert a mod bitfield into a string
     // alloc must be an arena allocator, for ease of memory management
-    fn encode_mods(alloc: *std.mem.Allocator, mods: c_int) ![]const u8 {
+    fn encode_mods(alloc: std.mem.Allocator, mods: c_int) ![]const u8 {
         var out = try std.fmt.allocPrint(alloc, "", .{});
         std.debug.assert(out.len == 0);
 
         if ((mods & c.GLFW_MOD_SHIFT) != 0) {
-            out = try std.fmt.allocPrint(alloc, "S-{}", .{out});
+            out = try std.fmt.allocPrint(alloc, "S-{s}", .{out});
         }
         if ((mods & c.GLFW_MOD_CONTROL) != 0) {
-            out = try std.fmt.allocPrint(alloc, "C-{}", .{out});
+            out = try std.fmt.allocPrint(alloc, "C-{s}", .{out});
         }
         if ((mods & c.GLFW_MOD_ALT) != 0) {
-            out = try std.fmt.allocPrint(alloc, "A-{}", .{out});
+            out = try std.fmt.allocPrint(alloc, "A-{s}", .{out});
         }
         if ((mods & c.GLFW_MOD_SUPER) != 0) {
-            out = try std.fmt.allocPrint(alloc, "D-{}", .{out});
+            out = try std.fmt.allocPrint(alloc, "D-{s}", .{out});
         }
         return out;
     }
@@ -863,8 +863,8 @@ pub const Tui = struct {
 
     pub fn on_key(self: *Self, key: c_int, mods: c_int) !void {
         var arena = std.heap.ArenaAllocator.init(self.alloc);
-        var alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
+        const alloc = arena.allocator();
 
         var char_str = [1]u8{0};
         var str: ?[]const u8 = null;
@@ -885,14 +885,14 @@ pub const Tui = struct {
             if (mods_ != 0) {
                 const mod_str = try encode_mods(alloc, mods_);
                 std.debug.assert(mod_str.len != 0);
-                str = try std.fmt.allocPrint(alloc, "<{}{}>", .{ mod_str, str });
+                str = try std.fmt.allocPrint(alloc, "<{s}{s}>", .{ mod_str, str });
             }
         } else if (get_encoded(key)) |enc| {
             if (mods == 0) {
-                str = try std.fmt.allocPrint(alloc, "<{}>", .{enc});
+                str = try std.fmt.allocPrint(alloc, "<{s}>", .{enc});
             } else {
                 const mod_str = try encode_mods(alloc, mods);
-                str = try std.fmt.allocPrint(alloc, "<{}{}>", .{ mod_str, enc });
+                str = try std.fmt.allocPrint(alloc, "<{s}{s}>", .{ mod_str, enc });
             }
         } else {
             std.debug.print("Got unknown key {} {}\n", .{ key, mods });
@@ -909,6 +909,7 @@ pub const Tui = struct {
     }
 
     pub fn on_scroll(self: *Self, dx: f64, dy: f64) !void {
+        _ = dx;
         // Reset accumulator if we've changed directions
         if (self.mouse_scroll_y != 0 and std.math.signbit(dy) != std.math.signbit(self.mouse_scroll_y)) {
             self.mouse_scroll_y = 0;
@@ -936,15 +937,15 @@ pub const Tui = struct {
 
     pub fn on_mouse_button(self: *Self, button: c_int, action: c_int, mods: c_int) !void {
         var arena = std.heap.ArenaAllocator.init(self.alloc);
-        var alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
+        const alloc = arena.allocator();
 
         const button_str = switch (button) {
             c.GLFW_MOUSE_BUTTON_LEFT => "left",
             c.GLFW_MOUSE_BUTTON_RIGHT => "right",
             c.GLFW_MOUSE_BUTTON_MIDDLE => "middle",
             else => |b| {
-                std.debug.warn("Ignoring unknown mouse: {}\n", .{b});
+                std.debug.print("Ignoring unknown mouse: {}\n", .{b});
                 return;
             },
         };
@@ -974,6 +975,7 @@ export fn size_cb(w: ?*c.GLFWwindow, width: c_int, height: c_int) void {
 }
 
 export fn key_cb(w: ?*c.GLFWwindow, key: c_int, scancode: c_int, action: c_int, mods: c_int) void {
+    _ = scancode;
     const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
     var tui = @ptrCast(*Tui, @alignCast(8, ptr));
     if (action == c.GLFW_PRESS or action == c.GLFW_REPEAT) {
@@ -987,7 +989,7 @@ export fn mouse_pos_cb(w: ?*c.GLFWwindow, x: f64, y: f64) void {
     const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
     var tui = @ptrCast(*Tui, @alignCast(8, ptr));
     tui.on_mouse_pos(x, y) catch |err| {
-        std.debug.print("Failed on_mouse_pos: {}\n", .{err});
+        std.debug.print("Failed on_mouse_pos: {any}\n", .{err});
     };
 }
 
@@ -995,7 +997,7 @@ export fn mouse_button_cb(w: ?*c.GLFWwindow, button: c_int, action: c_int, mods:
     const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
     var tui = @ptrCast(*Tui, @alignCast(8, ptr));
     tui.on_mouse_button(button, action, mods) catch |err| {
-        std.debug.print("Failed on_mouse_button: {}\n", .{err});
+        std.debug.print("Failed on_mouse_button: {any}\n", .{err});
     };
 }
 
@@ -1003,6 +1005,6 @@ export fn scroll_cb(w: ?*c.GLFWwindow, dx: f64, dy: f64) void {
     const ptr = c.glfwGetWindowUserPointer(w) orelse std.debug.panic("Missing user pointer", .{});
     var tui = @ptrCast(*Tui, @alignCast(8, ptr));
     tui.on_scroll(dx, dy) catch |err| {
-        std.debug.print("Failed on_scroll: {}\n", .{err});
+        std.debug.print("Failed on_scroll: {any}\n", .{err});
     };
 }

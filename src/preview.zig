@@ -24,18 +24,19 @@ pub const Preview = struct {
     draw_continuously: bool,
 
     pub fn init(
-        alloc: *std.mem.Allocator,
+        alloc: std.mem.Allocator,
         device: c.WGPUDeviceId,
         frag: []const u32,
         draw_continuously: bool,
     ) !Preview {
         var arena = std.heap.ArenaAllocator.init(alloc);
-        const tmp_alloc: *std.mem.Allocator = &arena.allocator;
         defer arena.deinit();
 
+        var tmp_alloc = arena.allocator();
+
         // Build the shaders using shaderc
-        const vert_spv = shaderc.build_shader_from_file(tmp_alloc, "shaders/preview.vert") catch |err| {
-            std.debug.panic("Could not build preview.vert", .{});
+        const vert_spv = shaderc.build_shader_from_file(&tmp_alloc, "shaders/preview.vert") catch |err| {
+            std.debug.panic("Could not build preview.vert: {}", .{err});
         };
         const vert_shader = c.wgpu_device_create_shader_module(
             device,
@@ -72,10 +73,8 @@ pub const Preview = struct {
                 .binding = 0,
                 .visibility = c.WGPUShaderStage_VERTEX | c.WGPUShaderStage_FRAGMENT,
                 .ty = c.WGPUBindingType_UniformBuffer,
-
                 .has_dynamic_offset = false,
                 .min_buffer_binding_size = 0,
-
                 .multisampled = undefined,
                 .view_dimension = undefined,
                 .texture_component_type = undefined,
@@ -98,7 +97,6 @@ pub const Preview = struct {
                 .buffer = uniform_buffer,
                 .offset = 0,
                 .size = @sizeOf(c.fpPreviewUniforms),
-
                 .sampler = 0, // None
                 .texture_view = 0, // None
             },
@@ -137,31 +135,31 @@ pub const Preview = struct {
                     .entry_point = "main",
                 },
                 .rasterization_state = &(c.WGPURasterizationStateDescriptor){
-                    .front_face = c.WGPUFrontFace._Ccw,
-                    .cull_mode = c.WGPUCullMode._None,
+                    .front_face = c.WGPUFrontFace_Ccw,
+                    .cull_mode = c.WGPUCullMode_None,
                     .depth_bias = 0,
                     .depth_bias_slope_scale = 0.0,
                     .depth_bias_clamp = 0.0,
                 },
-                .primitive_topology = c.WGPUPrimitiveTopology._TriangleList,
+                .primitive_topology = c.WGPUPrimitiveTopology_TriangleList,
                 .color_states = &(c.WGPUColorStateDescriptor){
-                    .format = c.WGPUTextureFormat._Bgra8Unorm,
+                    .format = c.WGPUTextureFormat_Bgra8Unorm,
                     .alpha_blend = (c.WGPUBlendDescriptor){
-                        .src_factor = c.WGPUBlendFactor._One,
-                        .dst_factor = c.WGPUBlendFactor._Zero,
-                        .operation = c.WGPUBlendOperation._Add,
+                        .src_factor = c.WGPUBlendFactor_One,
+                        .dst_factor = c.WGPUBlendFactor_Zero,
+                        .operation = c.WGPUBlendOperation_Add,
                     },
                     .color_blend = (c.WGPUBlendDescriptor){
-                        .src_factor = c.WGPUBlendFactor._One,
-                        .dst_factor = c.WGPUBlendFactor._Zero,
-                        .operation = c.WGPUBlendOperation._Add,
+                        .src_factor = c.WGPUBlendFactor_One,
+                        .dst_factor = c.WGPUBlendFactor_Zero,
+                        .operation = c.WGPUBlendOperation_Add,
                     },
                     .write_mask = c.WGPUColorWrite_ALL,
                 },
                 .color_states_length = 1,
                 .depth_stencil_state = null,
                 .vertex_state = (c.WGPUVertexStateDescriptor){
-                    .index_format = c.WGPUIndexFormat._Uint16,
+                    .index_format = c.WGPUIndexFormat_Uint16,
                     .vertex_buffers = null,
                     .vertex_buffers_length = 0,
                 },
@@ -253,8 +251,8 @@ pub const Preview = struct {
                     .size = self.tex_size,
                     .mip_level_count = 1,
                     .sample_count = 1,
-                    .dimension = c.WGPUTextureDimension._D2,
-                    .format = c.WGPUTextureFormat._Bgra8Unorm,
+                    .dimension = c.WGPUTextureDimension_D2,
+                    .format = c.WGPUTextureFormat_Bgra8Unorm,
 
                     // We render to this texture, then use it as a source when
                     // blitting into the final UI image
@@ -274,9 +272,9 @@ pub const Preview = struct {
                 self.tex[i],
                 &(c.WGPUTextureViewDescriptor){
                     .label = "preview_tex_view",
-                    .dimension = c.WGPUTextureViewDimension._D2,
-                    .format = c.WGPUTextureFormat._Bgra8Unorm,
-                    .aspect = c.WGPUTextureAspect._All,
+                    .dimension = c.WGPUTextureViewDimension_D2,
+                    .format = c.WGPUTextureFormat_Bgra8Unorm,
+                    .aspect = c.WGPUTextureAspect_All,
                     .base_mip_level = 0,
                     .level_count = 1,
                     .base_array_layer = 0,
@@ -309,17 +307,17 @@ pub const Preview = struct {
             @sizeOf(c.fpPreviewUniforms),
         );
 
-        const load_op = if (self.uniforms._tile_num == 0)
-            c.WGPULoadOp._Clear
+        const load_op: c.WGPULoadOp = if (self.uniforms._tile_num == 0)
+            c.WGPULoadOp_Clear
         else
-            c.WGPULoadOp._Load;
+            c.WGPULoadOp_Load;
         const color_attachments = [_]c.WGPURenderPassColorAttachmentDescriptor{
             (c.WGPURenderPassColorAttachmentDescriptor){
                 .attachment = if (self.uniforms._tiles_per_side == 1) self.tex_view[1] else self.tex_view[0],
                 .resolve_target = 0,
                 .channel = (c.WGPUPassChannel_Color){
                     .load_op = load_op,
-                    .store_op = c.WGPUStoreOp._Store,
+                    .store_op = c.WGPUStoreOp_Store,
                     .clear_value = (c.WGPUColor){
                         .r = 0.0,
                         .g = 0.0,

@@ -16,7 +16,7 @@ pub const Window = struct {
         } else {
             var err_str: [*c]u8 = null;
             const err = c.glfwGetError(&err_str);
-            std.debug.panic("Failed to open window: {} ({})", .{ err, err_str });
+            std.debug.panic("Failed to open window: {any} ({s})", .{ err, err_str });
         }
     }
 
@@ -41,7 +41,7 @@ pub const Window = struct {
         mouse_button_cb: c.GLFWmousebuttonfun,
         mouse_pos_cb: c.GLFWcursorposfun,
         scroll_cb: c.GLFWscrollfun,
-        data: ?*c_void,
+        data: ?*anyopaque,
     ) void {
         // Attach the TUI handle to the window so we can extract it
         _ = c.glfwSetWindowUserPointer(self.window, data);

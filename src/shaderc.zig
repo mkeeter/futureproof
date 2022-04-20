@@ -17,7 +17,7 @@ const CompilationError = error{
 
     UnknownError,
 };
-fn status_to_err(i: c_int) CompilationError {
+fn status_to_err(i: c_uint) CompilationError {
     switch (i) {
         c.shaderc_compilation_status_invalid_stage => return CompilationError.InvalidStage,
         c.shaderc_compilation_status_compilation_error => return CompilationError.CompilationError,
@@ -31,7 +31,11 @@ fn status_to_err(i: c_int) CompilationError {
     }
 }
 
-export fn include_cb(user_data: ?*c_void, requested_source: [*c]const u8, include_type: c_int, requesting_source: [*c]const u8, include_depth: usize) *c.shaderc_include_result {
+export fn include_cb(user_data: ?*anyopaque, requested_source: [*c]const u8, include_type: c_int, requesting_source: [*c]const u8, include_depth: usize) *c.shaderc_include_result {
+    _ = requesting_source;
+    _ = include_type;
+    _ = include_depth;
+
     const alloc = @ptrCast(*std.mem.Allocator, @alignCast(8, user_data));
     var out = alloc.create(c.shaderc_include_result) catch |err| {
         std.debug.panic("Could not allocate shaderc_include_result: {}", .{err});
@@ -44,9 +48,9 @@ export fn include_cb(user_data: ?*c_void, requested_source: [*c]const u8, includ
         .content_length = 0,
     };
 
-    const name = std.mem.spanZ(requested_source);
-    const file = std.fs.cwd().openFile(name, std.fs.File.OpenFlags{ .read = true }) catch |err| {
-        const msg = std.fmt.allocPrint(alloc, "{}", .{err}) catch |err2| {
+    const name = std.mem.span(requested_source);
+    const file = std.fs.cwd().openFile(name, std.fs.File.OpenFlags{ .mode = .read_only }) catch |err| {
+        const msg = std.fmt.allocPrint(alloc.*, "{}", .{err}) catch |err2| {
             std.debug.panic("Could not allocate error message: {}", .{err2});
         };
         out.content = msg.ptr;
@@ -54,6 +58,7 @@ export fn include_cb(user_data: ?*c_void, requested_source: [*c]const u8, includ
 
         return out;
     };
+    defer file.close();
 
     const size = file.getEndPos() catch |err| {
         std.debug.panic("Could not get end position of file: {}", .{err});
@@ -72,7 +77,7 @@ export fn include_cb(user_data: ?*c_void, requested_source: [*c]const u8, includ
     return out;
 }
 
-export fn include_release_cb(user_data: ?*c_void, include_result: ?*c.shaderc_include_result) void {
+export fn include_release_cb(user_data: ?*anyopaque, include_result: ?*c.shaderc_include_result) void {
     if (include_result != null) {
         const alloc = @ptrCast(*std.mem.Allocator, @alignCast(8, user_data));
         const r = @ptrCast(*c.shaderc_include_result, include_result);
@@ -84,7 +89,7 @@ export fn include_release_cb(user_data: ?*c_void, include_result: ?*c.shaderc_in
 }
 
 pub fn build_shader_from_file(alloc: *std.mem.Allocator, comptime name: []const u8) ![]u32 {
-    const buf = try util.file_contents(alloc, name);
+    const buf = try util.file_contents(alloc.*, name);
     return build_shader(alloc, name, buf);
 }
 
@@ -100,17 +105,17 @@ pub fn build_shader(alloc: *std.mem.Allocator, name: []const u8, src: []const u8
         compiler,
         src.ptr,
         src.len,
-        c.shaderc_shader_kind.shaderc_glsl_infer_from_source,
+        c.shaderc_glsl_infer_from_source,
         name.ptr,
         "main",
         options,
     );
     defer c.shaderc_result_release(result);
     const r = c.shaderc_result_get_compilation_status(result);
-    if (@enumToInt(r) != c.shaderc_compilation_status_success) {
+    if (r != c.shaderc_compilation_status_success) {
         const err = c.shaderc_result_get_error_message(result);
-        std.debug.warn("Shader error: {} {s}\n", .{ r, err });
-        return status_to_err(@enumToInt(r));
+        std.debug.print("Shader error: {} {s}\n", .{ r, err });
+        return status_to_err(r);
     }
 
     // Copy the result out of the shader
@@ -141,7 +146,7 @@ pub const Result = union(enum) {
     Shader: Shader,
     Error: Error,
 
-    pub fn deinit(self: Result, alloc: *std.mem.Allocator) void {
+    pub fn deinit(self: Result, alloc: std.mem.Allocator) void {
         switch (self) {
             .Shader => |d| alloc.free(d.spirv),
             .Error => |e| {
@@ -155,15 +160,15 @@ pub const Result = union(enum) {
 };
 
 pub fn build_preview_shader(
-    alloc: *std.mem.Allocator,
+    alloc: std.mem.Allocator,
     compiler: c.shaderc_compiler_t,
     src: []const u8,
 ) !Result {
     // Load the standard fragment shader prelude from a file
     // (or embed in the source if this is a release build)
     var arena = std.heap.ArenaAllocator.init(alloc);
-    var tmp_alloc: *std.mem.Allocator = &arena.allocator;
     defer arena.deinit();
+    var tmp_alloc = arena.allocator();
     const prelude = try util.file_contents(
         tmp_alloc,
         "shaders/preview.prelude.frag",
@@ -178,7 +183,7 @@ pub fn build_preview_shader(
         options,
         include_cb,
         include_release_cb,
-        alloc,
+        &tmp_alloc,
     );
     defer c.shaderc_compile_options_release(options);
 
@@ -186,7 +191,7 @@ pub fn build_preview_shader(
         compiler,
         full_src.ptr,
         full_src.len,
-        c.shaderc_shader_kind.shaderc_glsl_fragment_shader,
+        c.shaderc_glsl_fragment_shader,
         "preview",
         "main",
         options,
@@ -194,7 +199,7 @@ pub fn build_preview_shader(
     defer c.shaderc_result_release(result);
 
     const r = c.shaderc_result_get_compilation_status(result);
-    if (@enumToInt(r) != c.shaderc_compilation_status_success) {
+    if (r != c.shaderc_compilation_status_success) {
         var start: usize = 0;
         var prelude_newlines: u32 = 0;
         while (std.mem.indexOf(u8, prelude[start..], "\n")) |end| {

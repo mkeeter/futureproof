@@ -30,11 +30,17 @@ const Listener = struct {
             var offset: usize = 0;
             while (offset != in) {
                 const v = try msgpack.decode(self.alloc, buf[offset..in]);
-                if (v.data.Array[0].UInt == RPC_TYPE_RESPONSE) {
-                    try self.response_queue.put(v.data);
-                } else if (v.data.Array[0].UInt == RPC_TYPE_NOTIFICATION) {
-                    try self.event_queue.put(v.data);
-                    c.glfwPostEmptyEvent();
+                switch (v.data.Array[0]) {
+                    .UInt => |u| {
+                        if (u == RPC_TYPE_RESPONSE) {
+                            try self.response_queue.put(v.data);
+                        } else if (u == RPC_TYPE_NOTIFICATION) {
+                            try self.event_queue.put(v.data);
+                            c.glfwPostEmptyEvent();
+                        }
+                        //offset += v.offset;
+                    },
+                    else => std.debug.print("Unknown msg: {}\n", .{v.data.Array[0]}),
                 }
                 offset += v.offset;
             }
